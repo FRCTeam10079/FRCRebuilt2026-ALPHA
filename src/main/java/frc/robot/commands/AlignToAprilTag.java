@@ -38,25 +38,19 @@ public class AlignToAprilTag extends Command {
   private final Timer m_timer = new Timer();
 
   // PID Controllers for position control
-  private final PIDController m_pidX;
-  private final PIDController m_pidY;
-  private final PIDController m_pidRotate;
-
-  // Swerve drive request - field centric with velocity control
-  private final SwerveRequest.FieldCentric m_driveRequest =
-      new SwerveRequest.FieldCentric().withDriveRequestType(DriveRequestType.Velocity);
-
-  // Stop request
-  private final SwerveRequest m_stop;
+  private final PIDController m_pidX = new PIDController(
+      DrivetrainConstants.ALIGN_PID_KP,
+      DrivetrainConstants.ALIGN_PID_KI,
+      DrivetrainConstants.ALIGN_PID_KD);
+  private final PIDController m_pidY = new PIDController(
+      DrivetrainConstants.ALIGN_PID_KP,
+      DrivetrainConstants.ALIGN_PID_KI,
+      DrivetrainConstants.ALIGN_PID_KD);
+  private final PIDController m_pidRotate = new PIDController(
+      DrivetrainConstants.ALIGN_ROTATION_KP, 0, DrivetrainConstants.ALIGN_ROTATION_KD);
 
   // Target pose to align to
   private Pose2d m_targetPose;
-
-  // Configuration from Constants
-  private final double m_speed;
-  private final double m_rotationSpeed;
-  private final double m_positionTolerance;
-  private final double m_yawTolerance;
 
   // Offset configuration
   private final AlignPosition m_alignPosition;
@@ -86,29 +80,8 @@ public class AlignToAprilTag extends Command {
     m_stateMachine = RobotStateMachine.getInstance();
     m_alignPosition = alignPosition;
 
-    // Get constants
-    m_speed = DrivetrainConstants.ALIGN_SPEED_MPS;
-    m_rotationSpeed = DrivetrainConstants.ALIGN_ROTATION_SPEED;
-    m_positionTolerance = DrivetrainConstants.POSITION_TOLERANCE_METERS;
-    m_yawTolerance = DrivetrainConstants.YAW_TOLERANCE_RADIANS;
-
-    // Initialize PID controllers with values from Constants
-    m_pidX = new PIDController(
-        DrivetrainConstants.ALIGN_PID_KP,
-        DrivetrainConstants.ALIGN_PID_KI,
-        DrivetrainConstants.ALIGN_PID_KD);
-    m_pidY = new PIDController(
-        DrivetrainConstants.ALIGN_PID_KP,
-        DrivetrainConstants.ALIGN_PID_KI,
-        DrivetrainConstants.ALIGN_PID_KD);
-    m_pidRotate = new PIDController(
-        DrivetrainConstants.ALIGN_ROTATION_KP, 0, DrivetrainConstants.ALIGN_ROTATION_KD);
-
     // Enable continuous input for rotation (-PI to PI are same point)
     m_pidRotate.enableContinuousInput(-Math.PI, Math.PI);
-
-    // Create stop request
-    m_stop = m_driveRequest.withVelocityX(0).withVelocityY(0).withRotationalRate(0);
 
     // This command requires the drivetrain
     addRequirements(m_drivetrain);
@@ -287,7 +260,8 @@ public class AlignToAprilTag extends Command {
     boolean isRedSide = Constants.contains(new int[] {6, 7, 8, 9, 10, 11}, m_targetTagID);
 
     // Apply velocities to drivetrain
-    m_drivetrain.setControl(m_driveRequest
+    m_drivetrain.setControl(new SwerveRequest.FieldCentric()
+        .withDriveRequestType(DriveRequestType.Velocity)
         .withVelocityX(velocities[0])
         .withVelocityY(velocities[1])
         .withRotationalRate(velocities[2]));
@@ -297,11 +271,13 @@ public class AlignToAprilTag extends Command {
   private double[] calculatePIDVelocities(Pose2d currentPose) {
     // Calculate X velocity
     double velocityX = m_pidX.calculate(currentPose.getX());
-    velocityX = MathUtil.clamp(velocityX, -m_speed, m_speed);
+    velocityX = MathUtil.clamp(
+        velocityX, -DrivetrainConstants.ALIGN_SPEED_MPS, DrivetrainConstants.ALIGN_SPEED_MPS);
 
     // Calculate Y velocity
     double velocityY = m_pidY.calculate(currentPose.getY());
-    velocityY = MathUtil.clamp(velocityY, -m_speed, m_speed);
+    velocityY = MathUtil.clamp(
+        velocityY, -DrivetrainConstants.ALIGN_SPEED_MPS, DrivetrainConstants.ALIGN_SPEED_MPS);
 
     // Calculate rotation velocity
     double velocityYaw = m_pidRotate.calculate(currentPose.getRotation().getRadians());
@@ -312,9 +288,7 @@ public class AlignToAprilTag extends Command {
 
   /** Calculate distance between two poses */
   private double calculateDistance(Pose2d pose1, Pose2d pose2) {
-    double dx = pose1.getX() - pose2.getX();
-    double dy = pose1.getY() - pose2.getY();
-    return Math.sqrt(dx * dx + dy * dy);
+    return pose1.getTranslation().getDistance(pose2.getTranslation());
   }
 
   @Override
@@ -331,13 +305,13 @@ public class AlignToAprilTag extends Command {
     }
 
     // Calculate position and yaw error
-    double distance = m_targetPose.getTranslation().getDistance(currentPose.getTranslation());
+    double distance = calculateDistance(m_targetPose, currentPose);
     double yawError = Math.abs(MathUtil.angleModulus(
         m_targetPose.getRotation().getRadians() - currentPose.getRotation().getRadians()));
 
     // Check if within tolerance
-    boolean positionReached = distance <= m_positionTolerance;
-    boolean yawReached = yawError <= m_yawTolerance;
+    boolean positionReached = distance <= DrivetrainConstants.POSITION_TOLERANCE_METERS;
+    boolean yawReached = yawError <= DrivetrainConstants.YAW_TOLERANCE_RADIANS;
 
     SmartDashboard.putNumber("AlignToAprilTag/Distance", distance);
     SmartDashboard.putBoolean("AlignToAprilTag/PositionReached", positionReached);
@@ -349,7 +323,8 @@ public class AlignToAprilTag extends Command {
   @Override
   public void end(boolean interrupted) {
     // Stop the drivetrain
-    m_drivetrain.setControl(m_stop);
+    m_drivetrain.setControl(
+        new SwerveRequest.FieldCentric().withDriveRequestType(DriveRequestType.Velocity));
 
     // Return to field-centric drive mode
     m_stateMachine.setDrivetrainMode(RobotStateMachine.DrivetrainMode.FIELD_CENTRIC);

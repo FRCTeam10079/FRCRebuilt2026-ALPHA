@@ -4,7 +4,6 @@ import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
-import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.networktables.StructArrayPublisher;
 import edu.wpi.first.networktables.StructPublisher;
@@ -12,6 +11,7 @@ import edu.wpi.first.wpilibj.Timer;
 import edu.wpi.first.wpilibj.smartdashboard.Field2d;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
+import frc.robot.commands.AlignToAprilTag;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import java.util.List;
 import java.util.function.Supplier;
@@ -33,9 +33,9 @@ public class PathfindToTagCommand extends Command {
   private final PathConstraints m_constraints;
 
   // PID controllers for path following
-  private final PIDController m_xController;
-  private final PIDController m_yController;
-  private final PIDController m_rotationController;
+  private final PIDController m_xController = new PIDController(3.0, 0.0, 0.1);
+  private final PIDController m_yController = new PIDController(3.0, 0.0, 0.1);
+  private final PIDController m_rotationController = new PIDController(3.0, 0.0, 0.1);
 
   // State
   private Pose2d m_targetPose;
@@ -48,7 +48,6 @@ public class PathfindToTagCommand extends Command {
   private int m_debugCounter = 0;
 
   // NetworkTables publishers for AdvantageScope visualization
-  private final NetworkTable m_pathfindingTable;
   private final StructPublisher<Pose2d> m_currentPosePublisher;
   private final StructPublisher<Pose2d> m_goalPosePublisher;
   private final StructPublisher<Pose2d> m_targetWaypointPublisher;
@@ -104,24 +103,18 @@ public class PathfindToTagCommand extends Command {
     m_targetPoseSupplier = targetPoseSupplier;
     m_constraints = constraints;
 
-    // Translation PID (field-relative)
-    m_xController = new PIDController(3.0, 0.0, 0.1);
-    m_yController = new PIDController(3.0, 0.0, 0.1);
-
-    // Rotation PID with continuous input
-    m_rotationController = new PIDController(3.0, 0.0, 0.1);
     m_rotationController.enableContinuousInput(-Math.PI, Math.PI);
 
     // Initialize NetworkTables publishers for AdvantageScope
-    m_pathfindingTable = NetworkTableInstance.getDefault().getTable("Pathfinding");
+    var pathfindingTable = NetworkTableInstance.getDefault().getTable("Pathfinding");
     m_currentPosePublisher =
-        m_pathfindingTable.getStructTopic("CurrentPose", Pose2d.struct).publish();
+        pathfindingTable.getStructTopic("CurrentPose", Pose2d.struct).publish();
     m_goalPosePublisher =
-        m_pathfindingTable.getStructTopic("GoalPose", Pose2d.struct).publish();
+        pathfindingTable.getStructTopic("GoalPose", Pose2d.struct).publish();
     m_targetWaypointPublisher =
-        m_pathfindingTable.getStructTopic("TargetWaypoint", Pose2d.struct).publish();
+        pathfindingTable.getStructTopic("TargetWaypoint", Pose2d.struct).publish();
     m_pathPublisher =
-        m_pathfindingTable.getStructArrayTopic("Path", Pose2d.struct).publish();
+        pathfindingTable.getStructArrayTopic("Path", Pose2d.struct).publish();
 
     addRequirements(m_drivetrain);
   }
@@ -169,7 +162,7 @@ public class PathfindToTagCommand extends Command {
 
     // === PERIODIC DEBUG (every 50 loops ~ 1 second) ===
     m_debugCounter++;
-    boolean shouldLogDebug = (m_debugCounter % 50 == 1);
+    boolean shouldLogDebug = m_debugCounter % 50 == 1;
 
     // Check for new path from background thread
     if (Pathfinding.isNewPathAvailable()) {
@@ -355,7 +348,7 @@ public class PathfindToTagCommand extends Command {
     Pose2d currentPose = m_drivetrain.getState().Pose;
 
     // Check position tolerance
-    double positionError = currentPose.getTranslation().getDistance(m_targetPose.getTranslation());
+    double positionError = AlignToAprilTag.calculateDistance(currentPose, m_targetPose);
     boolean positionOk = positionError < PathfindingConstants.POSITION_TOLERANCE_METERS;
 
     // Check rotation tolerance

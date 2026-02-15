@@ -61,9 +61,6 @@ public class AlignToAprilTag extends Command {
   private int m_targetTagID;
   private boolean m_tagDetected = false;
 
-  // Store initial tag to prevent switching during alignment
-  private Integer m_storedTagID = null;
-
   /**
    * Creates a new AlignToAprilTag command
    *
@@ -102,9 +99,6 @@ public class AlignToAprilTag extends Command {
     // Set state machine to vision tracking mode
     m_stateMachine.setDrivetrainMode(RobotStateMachine.DrivetrainMode.VISION_TRACKING);
     m_stateMachine.setAlignedToTarget(false);
-
-    // Reset stored tag
-    m_storedTagID = null;
 
     // Get current robot pose
     Pose2d robotPose = m_drivetrain.getState().Pose;
@@ -155,9 +149,6 @@ public class AlignToAprilTag extends Command {
           + " not in map, using odometry: "
           + m_targetTagID);
     }
-
-    // Store the tag ID to prevent switching mid-alignment
-    m_storedTagID = m_targetTagID;
 
     // Get tag data
     double[] tagData = AprilTagMaps.aprilTagMap.get(m_targetTagID);
@@ -287,7 +278,7 @@ public class AlignToAprilTag extends Command {
   }
 
   /** Calculate distance between two poses */
-  private double calculateDistance(Pose2d pose1, Pose2d pose2) {
+  public static double calculateDistance(Pose2d pose1, Pose2d pose2) {
     return pose1.getTranslation().getDistance(pose2.getTranslation());
   }
 

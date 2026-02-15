@@ -40,8 +40,9 @@ public class LocalADStar implements Pathfinder {
   private double m_nodeSize = PathfindingConstants.NODE_SIZE_METERS;
   private double m_fieldLength = PathfindingConstants.FIELD_LENGTH_METERS;
   private double m_fieldWidth = PathfindingConstants.FIELD_WIDTH_METERS;
-  private int m_nodesX;
-  private int m_nodesY;
+  // Calculate grid dimensions
+  private int m_nodesX = (int) Math.ceil(m_fieldLength / m_nodeSize);
+  private int m_nodesY = (int) Math.ceil(m_fieldWidth / m_nodeSize);
 
   // AD* data structures
   private final HashMap<GridPosition, Double> m_g = new HashMap<>();
@@ -83,10 +84,6 @@ public class LocalADStar implements Pathfinder {
     // Load obstacles from navgrid.json (already includes robot buffer from
     // PathPlanner)
     loadObstacles("pathplanner/navgrid.json");
-
-    // Calculate grid dimensions
-    m_nodesX = (int) Math.ceil(m_fieldLength / m_nodeSize);
-    m_nodesY = (int) Math.ceil(m_fieldWidth / m_nodeSize);
 
     System.out.println("[LocalADStar] Grid: " + m_nodesX + "x" + m_nodesY + " nodes");
     System.out.println("[LocalADStar] Node size: " + m_nodeSize + "m");

@@ -7,7 +7,6 @@ package frc.robot.subsystems;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
 import edu.wpi.first.math.util.Units;
-import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
@@ -21,9 +20,6 @@ import frc.robot.LimelightHelpers;
  * <p>For REBUILT 2026 season - used for hub alignment
  */
 public class LimelightSubsystem extends SubsystemBase {
-  // NetworkTable for Limelight data
-  private final NetworkTable m_limelightTable;
-
   // Basic targeting data entries
   private final NetworkTableEntry m_tid; // Target AprilTag ID
   private final NetworkTableEntry m_tx; // Horizontal offset from crosshair (degrees)
@@ -45,17 +41,17 @@ public class LimelightSubsystem extends SubsystemBase {
   /** Creates a new LimelightSubsystem */
   public LimelightSubsystem() {
     // Get the limelight NetworkTable
-    m_limelightTable = NetworkTableInstance.getDefault().getTable(VisionConstants.LIMELIGHT_NAME);
+    var limelightTable = NetworkTableInstance.getDefault().getTable(VisionConstants.LIMELIGHT_NAME);
 
     // Initialize NetworkTable entries
-    m_tid = m_limelightTable.getEntry("tid");
-    m_tx = m_limelightTable.getEntry("tx");
-    m_ty = m_limelightTable.getEntry("ty");
-    m_ta = m_limelightTable.getEntry("ta");
-    m_tv = m_limelightTable.getEntry("tv");
-    m_botPose = m_limelightTable.getEntry("botpose_targetspace");
-    m_botPoseFieldBlue = m_limelightTable.getEntry("botpose_wpiblue");
-    m_activePipeline = m_limelightTable.getEntry("getpipe");
+    m_tid = limelightTable.getEntry("tid");
+    m_tx = limelightTable.getEntry("tx");
+    m_ty = limelightTable.getEntry("ty");
+    m_ta = limelightTable.getEntry("ta");
+    m_tv = limelightTable.getEntry("tv");
+    m_botPose = limelightTable.getEntry("botpose_targetspace");
+    m_botPoseFieldBlue = limelightTable.getEntry("botpose_wpiblue");
+    m_activePipeline = limelightTable.getEntry("getpipe");
 
     // Configure Limelight
     LimelightHelpers.setPipelineIndex(

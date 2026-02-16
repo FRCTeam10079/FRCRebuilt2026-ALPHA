@@ -6,8 +6,12 @@ package frc.robot;
 
 import static edu.wpi.first.units.Units.*;
 
+import com.pathplanner.lib.auto.AutoBuilder;
+import com.pathplanner.lib.auto.NamedCommands;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.wpilibj.GenericHID.RumbleType;
+import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
@@ -52,6 +56,9 @@ public class RobotContainer {
   private final Telemetry m_telemetry =
       new Telemetry(TunerConstants.kSpeedAt12Volts.in(MetersPerSecond));
 
+  // ==================== AUTO CHOOSER ====================
+  private final SendableChooser<Command> autoChooser;
+
   public RobotContainer() {
     // Link limelight to drivetrain for vision-based odometry
     limelight.setDrivetrain(drivetrain);
@@ -64,8 +71,63 @@ public class RobotContainer {
     // Initialize the pathfinding system
     initializePathfinding();
 
+    // ==================== REGISTER NAMED COMMANDS ====================
+    // These MUST be registered BEFORE any PathPlanner autos/paths are created.
+    // Named commands are referenced by name in PathPlanner GUI auto files.
+    registerNamedCommands();
+
+    // ==================== BUILD AUTO CHOOSER ====================
+    // Build a SendableChooser populated with all PathPlanner autos in the
+    // deploy/pathplanner/autos directory. Falls back to AD* pathfind if no
+    // PathPlanner autos exist yet.
+    autoChooser = AutoBuilder.buildAutoChooser();
+    SmartDashboard.putData("Auto Chooser", autoChooser);
+
     // Configure button bindings
     configureBindings();
+  }
+
+  /**
+   * Register all named commands for PathPlanner autonomous routines. These commands are triggered
+   * by event markers and command groups in PathPlanner auto files.
+   *
+   * <p>IMPORTANT: Must be called BEFORE any PathPlannerAuto or AutoBuilder.buildAutoChooser()
+   * calls.
+   */
+  private void registerNamedCommands() {
+    // Intake: run intake motors to collect game pieces
+    NamedCommands.registerCommand(
+        "intake", Commands.startEnd(() -> intake.intakeIn(), () -> intake.stop(), intake));
+
+    // Indexer: feed game pieces forward
+    NamedCommands.registerCommand(
+        "runIndexer", new RunIndexer(indexer, Constants.IndexerConstants.kForwardSpeed));
+
+    // Indexer: reverse to unjam
+    NamedCommands.registerCommand(
+        "reverseIndexer", new RunIndexer(indexer, Constants.IndexerConstants.kReverseSpeed));
+
+    // Shooter: spin up flywheel to target RPM and hold
+    NamedCommands.registerCommand(
+        "spinUpShooter", shooter.holdRPMCommand(Constants.ShooterConstants.SHOOTER_SPINUP_RPM));
+
+    // Shoot: spin up shooter, wait until ready, then feed with indexer
+    NamedCommands.registerCommand(
+        "shoot",
+        shooter
+            .holdRPMCommand(Constants.ShooterConstants.SHOOTER_SPINUP_RPM)
+            .alongWith(Commands.waitUntil(shooter::isReady)
+                .andThen(new RunIndexer(indexer, Constants.IndexerConstants.kForwardSpeed)
+                    .withTimeout(1.0))));
+
+    // Stop all mechanisms
+    NamedCommands.registerCommand("stopAll", Commands.runOnce(() -> {
+      intake.stop();
+      indexer.stop();
+      // Shooter stop is handled by ending the holdRPM command
+    }));
+
+    System.out.println("[RobotContainer] Named commands registered for PathPlanner");
   }
 
   /**
@@ -154,9 +216,9 @@ public class RobotContainer {
     // Uses AD* algorithm to find safe path around obstacles
     m_driverController.x().whileTrue(drivetrain.pathfindToAprilTag10());
 
-    // B button - Pathfind to AprilTag 18 (Blue Alliance Hub Face)
-    // Alternative hub for testing/blue alliance
-    m_driverController.b().whileTrue(drivetrain.pathfindToAprilTag(18));
+    // NOTE: Pathfind to AprilTag 18 moved to operator POV-Up to avoid
+    // conflicting with driver B button (reverse indexer).
+    m_operatorController.povUp().whileTrue(drivetrain.pathfindToAprilTag(18));
 
     // ==================== OPERATOR (TEST) CONTROLS ====================
     // Heading Lock to 0 degrees
@@ -223,15 +285,20 @@ public class RobotContainer {
   }
 
   /**
-   * Returns the autonomous command to run during autonomous period. Uses pathfinding to navigate to
-   * AprilTag 10 (Red Alliance Hub).
+   * Returns the autonomous command to run during autonomous period. Uses the auto chooser from
+   * SmartDashboard if a PathPlanner auto is selected, otherwise falls back to AD* pathfinding.
    */
   public Command getAutonomousCommand() {
-    // Set pathfinding to use autonomous obstacles (tighter margins)
-    Pathfinding.setAutoObstacles();
+    Command selectedAuto = autoChooser.getSelected();
 
-    // Return pathfinding command to AprilTag 10
-    return drivetrain.pathfindToAprilTag10().withName("Auto: Pathfind to Tag 10");
+    // If a PathPlanner auto was selected (not the default "none"), use it
+    if (selectedAuto != null) {
+      return selectedAuto;
+    }
+
+    // Fallback: use AD* pathfinding to AprilTag 10 (Red Alliance Hub)
+    Pathfinding.setAutoObstacles();
+    return drivetrain.pathfindToAprilTag10().withName("Fallback: Pathfind to Tag 10");
   }
 
   /**

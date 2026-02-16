@@ -156,6 +156,18 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
         0,
         0);
 
+    // ==================== ALLIANCE-BASED TAG ID FILTERING ====================
+    // Only track tags on the relevant side of the field to reduce noise from
+    // distant tags and prevent MegaTag2 multi-tag ambiguity flips.
+    var alliance = DriverStation.getAlliance();
+    if (alliance.isPresent()) {
+      int[] validTags = alliance.get() == Alliance.Red
+          ? frc.robot.Constants.AprilTagMaps.RED_SIDE_TAGS
+          : frc.robot.Constants.AprilTagMaps.BLUE_SIDE_TAGS;
+      LimelightHelpers.SetFiducialIDFiltersOverride(
+          frc.robot.Constants.VisionConstants.LIMELIGHT_NAME, validTags);
+    }
+
     // Get MegaTag2 pose estimate (uses robot orientation for better single-tag
     // accuracy)
     LimelightHelpers.PoseEstimate mt2Estimate =
@@ -212,14 +224,41 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
       return;
     }
 
+    // ==================== MEGATAG2 FLIP FIX ====================
+    // Reject vision measurements that diverge too far from the current odometry
+    // estimate. This catches the "MegaTag2 flip" where the pose jumps to the
+    // opposite side of the field due to heading/IMU errors or multi-tag ambiguity.
+    double visionOdoDist = mt2Estimate.pose.getTranslation().getDistance(odoPose.getTranslation());
+    int tagCount = mt2Estimate.tagCount;
+    double maxDivergence = tagCount <= 1
+        ? frc.robot.Constants.VisionConstants.MAX_VISION_ODO_DIVERGENCE_SINGLE_TAG
+        : frc.robot.Constants.VisionConstants.MAX_VISION_ODO_DIVERGENCE_MULTI_TAG;
+
+    SmartDashboard.putNumber("Vision/OdoDivergence", visionOdoDist);
+
+    if (visionOdoDist > maxDivergence) {
+      SmartDashboard.putString("Vision/Status", "ODO_DIVERGE_REJECTED");
+      instrumentVision("ODO_DIVERGE", mt2Estimate, odoPose);
+      return;
+    }
+
     // Calculate dynamic standard deviations based on distance and tag count
     // Formula from Team 6328: stdDev = coefficient * (avgDist^1.2) / (tagCount^2)
     double avgTagDist = mt2Estimate.avgTagDist;
-    int tagCount = mt2Estimate.tagCount;
 
     double xyStdDev = frc.robot.Constants.VisionConstants.XY_STD_DEV_COEFFICIENT
         * Math.pow(avgTagDist, 1.2)
         / Math.pow(tagCount, 2.0);
+
+    // ==================== MULTI-TAG AMBIGUITY SCALING ====================
+    // If multi-tag result is in the "suspicious" range (diverging from odometry
+    // but not enough to hard-reject), scale up std devs so the Kalman filter
+    // applies only a weak correction instead of a full jump.
+    if (tagCount >= 2
+        && visionOdoDist > frc.robot.Constants.VisionConstants.SUSPICIOUS_DIVERGENCE_THRESHOLD) {
+      xyStdDev *= frc.robot.Constants.VisionConstants.SUSPICIOUS_STD_DEV_SCALE;
+      SmartDashboard.putString("Vision/Status", "ACCEPTED_SUSPICIOUS");
+    }
 
     // MegaTag2 doesn't provide reliable heading, so use very high theta std dev
     double thetaStdDev = Double.POSITIVE_INFINITY;

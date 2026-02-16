@@ -72,6 +72,13 @@ public class Robot extends TimedRobot {
         VisionConstants.LIMELIGHT_NAME, VisionConstants.IMU_MODE_SEED_EXTERNAL);
     double robotYaw = m_robotContainer.drivetrain.getState().Pose.getRotation().getDegrees();
     LimelightHelpers.SetRobotOrientation(VisionConstants.LIMELIGHT_NAME, robotYaw, 0, 0, 0, 0, 0);
+
+    // ==================== IMU SEEDING TELEMETRY ====================
+    // Publish the yaw being seeded so you can verify it matches reality
+    // before the match starts. Very important for MegaTag2 accuracy.
+    edu.wpi.first.wpilibj.smartdashboard.SmartDashboard.putNumber("Vision/SeedYaw", robotYaw);
+    edu.wpi.first.wpilibj.smartdashboard.SmartDashboard.putString(
+        "Vision/IMUMode", "SEEDING (Mode 1)");
   }
 
   @Override

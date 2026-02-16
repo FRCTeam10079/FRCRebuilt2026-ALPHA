@@ -216,7 +216,8 @@ public final class Constants {
 
     // Maximum angular velocity for valid vision measurements (degrees/sec)
     // MegaTag2 results degrade significantly when spinning fast
-    public static final double MAX_ANGULAR_VELOCITY_DEG_PER_SEC = 720.0; // 2 rotations/sec
+    // Limelight docs recommend 360 deg/s; previously 720 was too lenient
+    public static final double MAX_ANGULAR_VELOCITY_DEG_PER_SEC = 360.0; // 1 rotation/sec
 
     // Field boundary margins for pose rejection (meters)
     public static final double FIELD_BORDER_MARGIN = 0.5;
@@ -228,6 +229,20 @@ public final class Constants {
 
     // Ambiguity threshold for single-tag MegaTag1 (not used with MegaTag2)
     public static final double MAX_AMBIGUITY = 0.3;
+
+    // ==================== MEGATAG2 FLIP FIX CONSTANTS ====================
+    // Maximum allowable distance (meters) between vision pose and odometry pose.
+    // If the vision pose diverges further than this from odometry, it is rejected.
+    // This catches the "MegaTag2 flip" bug where the pose jumps to the opposite
+    // side of the field due to IMU heading errors or multi-tag ambiguity.
+    public static final double MAX_VISION_ODO_DIVERGENCE_SINGLE_TAG = 2.0; // 1 tag seen
+    public static final double MAX_VISION_ODO_DIVERGENCE_MULTI_TAG = 4.0; // 2+ tags seen
+
+    // When multi-tag measurement is suspicious (diverges > this threshold but
+    // within the hard-reject limit), scale up std devs by this factor instead
+    // of hard-rejecting. This lets the Kalman filter apply a very weak correction.
+    public static final double SUSPICIOUS_DIVERGENCE_THRESHOLD = 1.0; // meters
+    public static final double SUSPICIOUS_STD_DEV_SCALE = 10.0; // multiply std devs by 10x
 
     // ==================== LIMELIGHT 4 IMU MODES ====================
     // Mode 0: EXTERNAL_ONLY - Uses external gyro via SetRobotOrientation

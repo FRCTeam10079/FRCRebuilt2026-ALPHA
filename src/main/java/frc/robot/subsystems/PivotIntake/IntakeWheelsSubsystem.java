@@ -9,12 +9,10 @@ import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.IntakeConstants;
-import frc.robot.generated.TunerConstants;
 
 public class IntakeWheelsSubsystem extends SubsystemBase {
 
-  private final TalonFX intakeMotor =
-      new TalonFX(IntakeConstants.Wheels.MOTOR_ID, TunerConstants.kCANBus);
+  private final TalonFX intakeMotor = new TalonFX(IntakeConstants.Wheels.MOTOR_ID, "rio");
   private final VelocityVoltage m_velocityRequest =
       new VelocityVoltage(0).withSlot(0).withEnableFOC(true);
 

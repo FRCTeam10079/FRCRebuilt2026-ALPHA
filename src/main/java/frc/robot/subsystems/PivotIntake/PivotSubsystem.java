@@ -8,12 +8,10 @@ import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.IntakeConstants;
-import frc.robot.generated.TunerConstants;
 
 public class PivotSubsystem extends SubsystemBase {
 
-  private final TalonFX pivotMotor =
-      new TalonFX(IntakeConstants.Pivot.MOTOR_ID, TunerConstants.kCANBus);
+  private final TalonFX pivotMotor = new TalonFX(IntakeConstants.Pivot.MOTOR_ID, "rio");
   private double pivotSetpoint = IntakeConstants.Pivot.STOWED_POSITION;
 
   public PivotSubsystem() {

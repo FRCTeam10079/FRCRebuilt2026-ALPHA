@@ -21,8 +21,9 @@ public class IndexerSubsystem extends SubsystemBase {
   public IndexerSubsystem() {
     // Initialize Hardware
     // Now uses rio
-    m_feederMotor = new TalonFX(IndexerConstants.kFeederMotorID, "rio");
-    m_spindexerMotor = new TalonFX(IndexerConstants.kSpindexerMotorID, "rio");
+
+    m_feederMotor = new TalonFX(IndexerConstants.kFeederMotorID); // Defaults to RIO
+    m_spindexerMotor = new TalonFX(IndexerConstants.kSpindexerMotorID); // Defaults to RIO
 
     // ==================== FEEDER CONFIGURATION ====================
     TalonFXConfiguration feederConfig = new TalonFXConfiguration();
@@ -68,7 +69,7 @@ public class IndexerSubsystem extends SubsystemBase {
   /**
    * Sets the speeds of both indexer motors independently.
    *
-   * @param feederRPM    Target RPM for the fast feeder wheel
+   * @param feederRPM Target RPM for the fast feeder wheel
    * @param spindexerRPM Target RPM for the floor/spindexer wheel
    */
   public void setSpeeds(double feederRPM, double spindexerRPM) {

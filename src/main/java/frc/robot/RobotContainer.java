@@ -32,8 +32,7 @@ import frc.robot.subsystems.LimelightSubsystem;
 import frc.robot.subsystems.ShooterSubsystem;
 
 /**
- * RobotContainer for FRC 2026 REBUILT season This class is where the robot's
- * subsystems, commands,
+ * RobotContainer for FRC 2026 REBUILT season This class is where the robot's subsystems, commands,
  * and button bindings are defined.
  */
 public class RobotContainer {
@@ -58,7 +57,8 @@ public class RobotContainer {
   public final IntakeSubsystem intake = new IntakeSubsystem();
   public final ShooterSubsystem shooter = new ShooterSubsystem();
 
-  private final Telemetry m_telemetry = new Telemetry(TunerConstants.kSpeedAt12Volts.in(MetersPerSecond));
+  private final Telemetry m_telemetry =
+      new Telemetry(TunerConstants.kSpeedAt12Volts.in(MetersPerSecond));
 
   // ==================== AUTO CHOOSER ====================
   private final SendableChooser<Command> autoChooser;
@@ -113,13 +113,10 @@ public class RobotContainer {
   }
 
   /**
-   * Register all named commands for PathPlanner autonomous routines. These
-   * commands are triggered
+   * Register all named commands for PathPlanner autonomous routines. These commands are triggered
    * by event markers and command groups in PathPlanner auto files.
    *
-   * <p>
-   * IMPORTANT: Must be called BEFORE any PathPlannerAuto or
-   * AutoBuilder.buildAutoChooser()
+   * <p>IMPORTANT: Must be called BEFORE any PathPlannerAuto or AutoBuilder.buildAutoChooser()
    * calls.
    */
   private void registerNamedCommands() {
@@ -128,24 +125,38 @@ public class RobotContainer {
         "intake", Commands.startEnd(() -> intake.intakeIn(), () -> intake.stop(), intake));
 
     // Indexer: feed game pieces forward
+
     NamedCommands.registerCommand(
-        "runIndexer", new RunIndexer(indexer, Constants.IndexerConstants.kForwardSpeed));
+        "runIndexer",
+        new RunIndexer(
+            indexer,
+            Constants.IndexerConstants.kFeederTargetRPM,
+            Constants.IndexerConstants.kSpindexerTargetRPM));
 
     // Indexer: reverse to unjam
+
     NamedCommands.registerCommand(
-        "reverseIndexer", new RunIndexer(indexer, Constants.IndexerConstants.kReverseSpeed));
+        "reverseIndexer",
+        new RunIndexer(
+            indexer,
+            Constants.IndexerConstants.kFeederReverseRPM,
+            Constants.IndexerConstants.kSpindexerReverseRPM));
 
     // Shooter: spin up flywheel to target RPM and hold
     NamedCommands.registerCommand(
         "spinUpShooter", shooter.holdRPMCommand(Constants.ShooterConstants.SHOOTER_SPINUP_RPM));
 
     // Shoot: spin up shooter, wait until ready, then feed with indexer
+    // FIXED: Updated inner RunIndexer to use RPM constants
     NamedCommands.registerCommand(
         "shoot",
         shooter
             .holdRPMCommand(Constants.ShooterConstants.SHOOTER_SPINUP_RPM)
             .alongWith(Commands.waitUntil(shooter::isReady)
-                .andThen(new RunIndexer(indexer, Constants.IndexerConstants.kForwardSpeed)
+                .andThen(new RunIndexer(
+                        indexer,
+                        Constants.IndexerConstants.kFeederTargetRPM,
+                        Constants.IndexerConstants.kSpindexerTargetRPM)
                     .withTimeout(1.0))));
 
     // Stop all mechanisms
@@ -164,17 +175,32 @@ public class RobotContainer {
    * AutoRoutine APIs.
    */
   private void registerChoreoBindings() {
+    // FIXED: All RunIndexer calls updated below
     choreoAutoFactory
         .bind("intake", Commands.startEnd(() -> intake.intakeIn(), () -> intake.stop(), intake))
-        .bind("runIndexer", new RunIndexer(indexer, Constants.IndexerConstants.kForwardSpeed))
-        .bind("reverseIndexer", new RunIndexer(indexer, Constants.IndexerConstants.kReverseSpeed))
-        .bind("spinUpShooter", shooter.holdRPMCommand(Constants.ShooterConstants.SHOOTER_SPINUP_RPM))
+        .bind(
+            "runIndexer",
+            new RunIndexer(
+                indexer,
+                Constants.IndexerConstants.kFeederTargetRPM,
+                Constants.IndexerConstants.kSpindexerTargetRPM))
+        .bind(
+            "reverseIndexer",
+            new RunIndexer(
+                indexer,
+                Constants.IndexerConstants.kFeederReverseRPM,
+                Constants.IndexerConstants.kSpindexerReverseRPM))
+        .bind(
+            "spinUpShooter", shooter.holdRPMCommand(Constants.ShooterConstants.SHOOTER_SPINUP_RPM))
         .bind(
             "shoot",
             shooter
                 .holdRPMCommand(Constants.ShooterConstants.SHOOTER_SPINUP_RPM)
                 .alongWith(Commands.waitUntil(shooter::isReady)
-                    .andThen(new RunIndexer(indexer, Constants.IndexerConstants.kForwardSpeed)
+                    .andThen(new RunIndexer(
+                            indexer,
+                            Constants.IndexerConstants.kFeederTargetRPM,
+                            Constants.IndexerConstants.kSpindexerTargetRPM)
                         .withTimeout(1.0))))
         .bind(
             "stopAll",
@@ -192,8 +218,7 @@ public class RobotContainer {
   }
 
   /**
-   * Initialize the pathfinding system. This loads the navgrid and starts the
-   * background AD*
+   * Initialize the pathfinding system. This loads the navgrid and starts the background AD*
    * planning thread.
    */
   private void initializePathfinding() {
@@ -203,8 +228,7 @@ public class RobotContainer {
   }
 
   /**
-   * Configure button bindings for driver and operator controllers This is where
-   * you bind controller
+   * Configure button bindings for driver and operator controllers This is where you bind controller
    * buttons to commands
    */
   private void configureBindings() {
@@ -234,19 +258,25 @@ public class RobotContainer {
 
     // Y button - Reset Heading
     m_driverController.y().onTrue(drivetrain.runOnce(() -> drivetrain.seedFieldCentric()));
+    // ==================== INDEXER CONTROLS ====================
 
-    // Right Trigger - Run Indexer Forward (Intake/Feed)
-
+    // Right Trigger, Run Indexer Forward (Intake/Feed)
+    // Uses the new RPM constants for Feeder and Spindexer
     m_driverController
         .rightTrigger(0.5)
-        .whileTrue(new RunIndexer(indexer, Constants.IndexerConstants.kForwardSpeed)
+        .whileTrue(new RunIndexer(
+                indexer,
+                Constants.IndexerConstants.kFeederTargetRPM,
+                Constants.IndexerConstants.kSpindexerTargetRPM)
             .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming));
 
     // B Button - Run Indexer Reverse (Unjam)
-
     m_driverController
         .b()
-        .whileTrue(new RunIndexer(indexer, Constants.IndexerConstants.kReverseSpeed)
+        .whileTrue(new RunIndexer(
+                indexer,
+                Constants.IndexerConstants.kFeederReverseRPM,
+                Constants.IndexerConstants.kSpindexerReverseRPM)
             .withInterruptBehavior(Command.InterruptionBehavior.kCancelIncoming));
     // ==================== SLOW MODE ====================
     // Left trigger - Hold for slow mode (useful for precise positioning/scoring)
@@ -347,19 +377,15 @@ public class RobotContainer {
   }
 
   /**
-   * Returns the autonomous command to run during autonomous period. Uses the auto
-   * chooser from
-   * SmartDashboard if a PathPlanner auto is selected, otherwise falls back to AD*
-   * pathfinding.
+   * Returns the autonomous command to run during autonomous period. Uses the auto chooser from
+   * SmartDashboard if a PathPlanner auto is selected, otherwise falls back to AD* pathfinding.
    */
   public Command getAutonomousCommand() {
     String selectedChoreoTrajectory = choreoChooser.getSelected();
     if (selectedChoreoTrajectory != null && !selectedChoreoTrajectory.isBlank()) {
       AutoRoutine routine = choreoAutoFactory.newRoutine("SelectedChoreo");
       AutoTrajectory trajectory = routine.trajectory(selectedChoreoTrajectory);
-      routine
-          .active()
-          .onTrue(Commands.sequence(trajectory.resetOdometry(), trajectory.cmd()));
+      routine.active().onTrue(Commands.sequence(trajectory.resetOdometry(), trajectory.cmd()));
       return routine.cmd().withName("Choreo: " + selectedChoreoTrajectory);
     }
 
@@ -378,13 +404,10 @@ public class RobotContainer {
   /**
    * Compute the target heading to face the currently visible AprilTag.
    *
-   * <p>
-   * If a tag is visible, returns current heading - TX (to center the tag). If no
-   * tag visible,
+   * <p>If a tag is visible, returns current heading - TX (to center the tag). If no tag visible,
    * returns the current heading (maintain position).
    *
-   * <p>
-   * This is used by the heading lock test to dynamically track AprilTags.
+   * <p>This is used by the heading lock test to dynamically track AprilTags.
    */
   private double computeAprilTagHeading() {
     if (limelight.hasTarget()) {

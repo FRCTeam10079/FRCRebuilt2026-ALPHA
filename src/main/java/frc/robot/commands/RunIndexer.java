@@ -5,36 +5,39 @@ import frc.robot.subsystems.IndexerSubsystem;
 
 public class RunIndexer extends Command {
 
-  private final IndexerSubsystem indexer;
-  private final double speed;
+  private final IndexerSubsystem m_indexer;
+  private final double m_feederRPM;
+  private final double m_spindexerRPM;
 
-  public RunIndexer(IndexerSubsystem indexer, double speed) {
-    this.indexer = indexer;
-    this.speed = speed;
-
-    // Tell scheduler that we are using indexer
+  /**
+   * Runs the indexer with specific speeds for both motors.
+   *
+   * @param indexer The subsystem
+   * @param feederRPM Target RPM for the fast top roller
+   * @param spindexerRPM Target RPM for the floor/star wheel
+   */
+  public RunIndexer(IndexerSubsystem indexer, double feederRPM, double spindexerRPM) {
+    m_indexer = indexer;
+    m_feederRPM = feederRPM;
+    m_spindexerRPM = spindexerRPM;
     addRequirements(indexer);
   }
 
-  // Turn on when command starts
   @Override
   public void initialize() {
-    indexer.setSpeed(speed);
+    m_indexer.setSpeeds(m_feederRPM, m_spindexerRPM);
   }
 
   @Override
   public void execute() {
-    // Forces motor to keep spinning even if a CAN packet was dropped.
-    indexer.setSpeed(speed);
+    m_indexer.setSpeeds(m_feederRPM, m_spindexerRPM);
   }
 
-  // Turn off when command ends (button released)
   @Override
   public void end(boolean interrupted) {
-    indexer.stop();
+    m_indexer.stop();
   }
 
-  // Keep running until interrupted
   @Override
   public boolean isFinished() {
     return false;

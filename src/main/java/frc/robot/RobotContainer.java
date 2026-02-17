@@ -6,6 +6,9 @@ package frc.robot;
 
 import static edu.wpi.first.units.Units.*;
 
+import choreo.auto.AutoFactory;
+import choreo.auto.AutoRoutine;
+import choreo.auto.AutoTrajectory;
 import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.auto.NamedCommands;
 import edu.wpi.first.math.MathUtil;
@@ -14,6 +17,7 @@ import edu.wpi.first.wpilibj.smartdashboard.SendableChooser;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.Commands;
+import edu.wpi.first.wpilibj2.command.StartEndCommand;
 import edu.wpi.first.wpilibj2.command.button.CommandXboxController;
 import edu.wpi.first.wpilibj2.command.button.Trigger;
 import frc.robot.Constants.AlignPosition;
@@ -28,7 +32,8 @@ import frc.robot.subsystems.LimelightSubsystem;
 import frc.robot.subsystems.ShooterSubsystem;
 
 /**
- * RobotContainer for FRC 2026 REBUILT season This class is where the robot's subsystems, commands,
+ * RobotContainer for FRC 2026 REBUILT season This class is where the robot's
+ * subsystems, commands,
  * and button bindings are defined.
  */
 public class RobotContainer {
@@ -53,11 +58,12 @@ public class RobotContainer {
   public final IntakeSubsystem intake = new IntakeSubsystem();
   public final ShooterSubsystem shooter = new ShooterSubsystem();
 
-  private final Telemetry m_telemetry =
-      new Telemetry(TunerConstants.kSpeedAt12Volts.in(MetersPerSecond));
+  private final Telemetry m_telemetry = new Telemetry(TunerConstants.kSpeedAt12Volts.in(MetersPerSecond));
 
   // ==================== AUTO CHOOSER ====================
   private final SendableChooser<Command> autoChooser;
+  private final SendableChooser<String> choreoChooser = new SendableChooser<>();
+  private final AutoFactory choreoAutoFactory;
 
   public RobotContainer() {
     // Link limelight to drivetrain for vision-based odometry
@@ -71,10 +77,18 @@ public class RobotContainer {
     // Initialize the pathfinding system
     initializePathfinding();
 
+    choreoAutoFactory = new AutoFactory(
+        () -> drivetrain.getState().Pose,
+        drivetrain::resetPose,
+        drivetrain::followTrajectory,
+        true,
+        drivetrain);
+
     // ==================== REGISTER NAMED COMMANDS ====================
     // These MUST be registered BEFORE any PathPlanner autos/paths are created.
     // Named commands are referenced by name in PathPlanner GUI auto files.
     registerNamedCommands();
+    registerChoreoBindings();
 
     // ==================== BUILD AUTO CHOOSER ====================
     // Build a SendableChooser populated with all PathPlanner autos in the
@@ -83,15 +97,29 @@ public class RobotContainer {
     autoChooser = AutoBuilder.buildAutoChooser();
     SmartDashboard.putData("Auto Chooser", autoChooser);
 
+    configureChoreoChooser();
+    SmartDashboard.putData("Choreo Auto", choreoChooser);
+
     // Configure button bindings
     configureBindings();
   }
 
+  private void configureChoreoChooser() {
+    choreoChooser.setDefaultOption("RS", "RS");
+    choreoChooser.addOption("LS_Depot", "LS_Depot");
+    choreoChooser.addOption("LS_Neutral", "LS_Neutral");
+    choreoChooser.addOption("MS_Depot_Climb", "MS_Depot_Climb");
+    choreoChooser.addOption("None", "");
+  }
+
   /**
-   * Register all named commands for PathPlanner autonomous routines. These commands are triggered
+   * Register all named commands for PathPlanner autonomous routines. These
+   * commands are triggered
    * by event markers and command groups in PathPlanner auto files.
    *
-   * <p>IMPORTANT: Must be called BEFORE any PathPlannerAuto or AutoBuilder.buildAutoChooser()
+   * <p>
+   * IMPORTANT: Must be called BEFORE any PathPlannerAuto or
+   * AutoBuilder.buildAutoChooser()
    * calls.
    */
   private void registerNamedCommands() {
@@ -126,12 +154,46 @@ public class RobotContainer {
       indexer.stop();
       // Shooter stop is handled by ending the holdRPM command
     }));
-
     System.out.println("[RobotContainer] Named commands registered for PathPlanner");
   }
 
   /**
-   * Initialize the pathfinding system. This loads the navgrid and starts the background AD*
+   * Register Choreo global marker bindings for subsystem actions.
+   *
+   * <p>These bindings are evaluated from event markers inside Choreo trajectories when using
+   * AutoRoutine APIs.
+   */
+  private void registerChoreoBindings() {
+    choreoAutoFactory
+        .bind("intake", Commands.startEnd(() -> intake.intakeIn(), () -> intake.stop(), intake))
+        .bind("runIndexer", new RunIndexer(indexer, Constants.IndexerConstants.kForwardSpeed))
+        .bind("reverseIndexer", new RunIndexer(indexer, Constants.IndexerConstants.kReverseSpeed))
+        .bind("spinUpShooter", shooter.holdRPMCommand(Constants.ShooterConstants.SHOOTER_SPINUP_RPM))
+        .bind(
+            "shoot",
+            shooter
+                .holdRPMCommand(Constants.ShooterConstants.SHOOTER_SPINUP_RPM)
+                .alongWith(Commands.waitUntil(shooter::isReady)
+                    .andThen(new RunIndexer(indexer, Constants.IndexerConstants.kForwardSpeed)
+                        .withTimeout(1.0))))
+        .bind(
+            "stopAll",
+            Commands.runOnce(
+                () -> {
+                  intake.stop();
+                  indexer.stop();
+                  shooter.stop();
+                },
+                intake,
+                indexer,
+                shooter));
+
+    System.out.println("[RobotContainer] Marker bindings registered for Choreo");
+  }
+
+  /**
+   * Initialize the pathfinding system. This loads the navgrid and starts the
+   * background AD*
    * planning thread.
    */
   private void initializePathfinding() {
@@ -141,7 +203,8 @@ public class RobotContainer {
   }
 
   /**
-   * Configure button bindings for driver and operator controllers This is where you bind controller
+   * Configure button bindings for driver and operator controllers This is where
+   * you bind controller
    * buttons to commands
    */
   private void configureBindings() {
@@ -205,16 +268,15 @@ public class RobotContainer {
 
     // ==================== OPERATOR CONTROLS ====================
     // TODO: Add intake controls
-    // m_driverController
-    // .x()
-    // .toggleOnTrue(new StartEndCommand(() -> intake.intakeIn(), () ->
-    // intake.stop(), intake));
+    m_driverController
+        .x()
+        .toggleOnTrue(new StartEndCommand(() -> intake.intakeIn(), () -> intake.stop(), intake));
     // TODO: Add climb controls
 
     // ==================== PATHFINDING CONTROLS ====================
     // X button - Pathfind to AprilTag 10 (Red Alliance Hub Face)
     // Uses AD* algorithm to find safe path around obstacles
-    m_driverController.x().whileTrue(drivetrain.pathfindToAprilTag10());
+    // m_driverController.x().whileTrue(drivetrain.pathfindToAprilTag10());
 
     // NOTE: Pathfind to AprilTag 18 moved to operator POV-Up to avoid
     // conflicting with driver B button (reverse indexer).
@@ -285,10 +347,22 @@ public class RobotContainer {
   }
 
   /**
-   * Returns the autonomous command to run during autonomous period. Uses the auto chooser from
-   * SmartDashboard if a PathPlanner auto is selected, otherwise falls back to AD* pathfinding.
+   * Returns the autonomous command to run during autonomous period. Uses the auto
+   * chooser from
+   * SmartDashboard if a PathPlanner auto is selected, otherwise falls back to AD*
+   * pathfinding.
    */
   public Command getAutonomousCommand() {
+    String selectedChoreoTrajectory = choreoChooser.getSelected();
+    if (selectedChoreoTrajectory != null && !selectedChoreoTrajectory.isBlank()) {
+      AutoRoutine routine = choreoAutoFactory.newRoutine("SelectedChoreo");
+      AutoTrajectory trajectory = routine.trajectory(selectedChoreoTrajectory);
+      routine
+          .active()
+          .onTrue(Commands.sequence(trajectory.resetOdometry(), trajectory.cmd()));
+      return routine.cmd().withName("Choreo: " + selectedChoreoTrajectory);
+    }
+
     Command selectedAuto = autoChooser.getSelected();
 
     // If a PathPlanner auto was selected (not the default "none"), use it
@@ -304,10 +378,13 @@ public class RobotContainer {
   /**
    * Compute the target heading to face the currently visible AprilTag.
    *
-   * <p>If a tag is visible, returns current heading - TX (to center the tag). If no tag visible,
+   * <p>
+   * If a tag is visible, returns current heading - TX (to center the tag). If no
+   * tag visible,
    * returns the current heading (maintain position).
    *
-   * <p>This is used by the heading lock test to dynamically track AprilTags.
+   * <p>
+   * This is used by the heading lock test to dynamically track AprilTags.
    */
   private double computeAprilTagHeading() {
     if (limelight.hasTarget()) {

@@ -92,7 +92,7 @@ public final class Constants {
   /** Intake constants (placeholder) */
   public static final class IntakeConstants {
     public static final double INTAKE_SPEED = -0.5;
-    public static final int INTAKE_MOTOR_ID = 19; // TODO: Make real
+    public static final int INTAKE_MOTOR_ID = 24; // TODO: Make real
     public static final int PIVOT_ENCODER_ID = 1; // TODO: Make real
     public static final int PIVOT_MOTOR_ID = 2; // TODO: Make real
     public static final double PIVOT_INTAKE_POSITION = 0.0; // TODO: Tune
@@ -265,8 +265,8 @@ public final class Constants {
 
   public static final class IndexerConstants {
 
-    public static final int kFeederMotorID = 20; // This ID confirmed
-    public static final int kSpindexerMotorID = 15; // This id not confirmed
+    public static final int kFeederMotorID = 15; // This ID confirmed
+    public static final int kSpindexerMotorID = 21; // This id not confirmed
 
     // Safety Limits
     public static final int kCurrentLimit = 40;

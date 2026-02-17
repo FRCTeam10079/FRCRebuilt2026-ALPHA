@@ -2,6 +2,7 @@ package frc.robot.subsystems;
 
 import static edu.wpi.first.units.Units.*;
 
+import choreo.trajectory.SwerveSample;
 import com.ctre.phoenix6.SignalLogger;
 import com.ctre.phoenix6.Utils;
 import com.ctre.phoenix6.swerve.SwerveDrivetrainConstants;
@@ -12,6 +13,7 @@ import com.pathplanner.lib.auto.AutoBuilder;
 import com.pathplanner.lib.config.PIDConstants;
 import com.pathplanner.lib.config.RobotConfig;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
+import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.MathUtil;
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.geometry.Pose2d;
@@ -79,6 +81,11 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /** Swerve request to apply during robot-centric path following */
   private final SwerveRequest.ApplyRobotSpeeds m_pathApplyRobotSpeeds =
       new SwerveRequest.ApplyRobotSpeeds();
+
+  // ==================== CHOREO TRAJECTORY FOLLOWER ====================
+  private final PIDController m_choreoXController = new PIDController(7.0, 0.0, 0.0);
+  private final PIDController m_choreoYController = new PIDController(7.0, 0.0, 0.0);
+  private final PIDController m_choreoHeadingController = new PIDController(5.0, 0.0, 0.0);
 
   /* Swerve requests to apply during SysId characterization */
   private final SwerveRequest.SysIdSwerveTranslation m_translationCharacterization =
@@ -562,6 +569,24 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   }
 
   /**
+   * Follow a Choreo swerve sample. This method is passed into Choreo's AutoFactory.
+   *
+   * @param sample Choreo sample at the current autonomous timestamp
+   */
+  public void followTrajectory(SwerveSample sample) {
+    Pose2d currentPose = getState().Pose;
+
+    ChassisSpeeds targetFieldSpeeds = new ChassisSpeeds(
+        sample.vx + m_choreoXController.calculate(currentPose.getX(), sample.x),
+        sample.vy + m_choreoYController.calculate(currentPose.getY(), sample.y),
+        sample.omega
+            + m_choreoHeadingController.calculate(
+                currentPose.getRotation().getRadians(), sample.heading));
+
+    setControl(m_fieldCentricRequest.withSpeeds(targetFieldSpeeds));
+  }
+
+  /**
    * Runs the SysId Quasistatic test in the given direction for the routine specified by
    * {@link #m_sysIdRoutineToApply}.
    *
@@ -605,6 +630,10 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
     updateVision();
     Logger.recordOutput("Drive Pos", getState().Pose);
+  }
+
+  {
+    m_choreoHeadingController.enableContinuousInput(-Math.PI, Math.PI);
   }
 
   // ==================== VISION MEASUREMENT OVERRIDES ====================

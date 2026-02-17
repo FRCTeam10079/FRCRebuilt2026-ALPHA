@@ -46,10 +46,13 @@ public class RobotContainer {
   public final LimelightSubsystem limelight = new LimelightSubsystem();
   // Indexer
   private final IndexerSubsystem indexer = new IndexerSubsystem();
-  private final PivotSubsystem pivot = new PivotSubsystem();
+
   // Mechanisms
-  private final IntakeWheelsSubsystem intake = new IntakeWheelsSubsystem();
+
   public final ShooterSubsystem shooter = new ShooterSubsystem();
+  // Intake
+  private final IntakeWheelsSubsystem intake = new IntakeWheelsSubsystem();
+  private final PivotSubsystem pivot = new PivotSubsystem();
 
   private final Telemetry m_telemetry =
       new Telemetry(TunerConstants.kSpeedAt12Volts.in(MetersPerSecond));
@@ -153,7 +156,20 @@ public class RobotContainer {
     m_operatorController
         .a()
         .toggleOnTrue(new StartEndCommand(() -> intake.intakeOut(), () -> intake.stop(), intake));
-
+    // Deploy Pivot Controls
+    m_operatorController
+        .rightBumper()
+        .toggleOnTrue(new StartEndCommand(
+            () -> pivot.deployPivot(), // action when button pressed
+            () -> {}, // nothing special on release
+            pivot));
+    // Stow Pivot Controls
+    m_operatorController
+        .leftBumper()
+        .toggleOnTrue(new StartEndCommand(
+            () -> pivot.stowPivot(), // action when button pressed
+            () -> {}, // nothing special on release
+            pivot));
     // TODO: Add climb controls
 
     // ==================== PATHFINDING CONTROLS ====================

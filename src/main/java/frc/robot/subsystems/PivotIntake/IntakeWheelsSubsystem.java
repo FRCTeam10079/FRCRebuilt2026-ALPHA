@@ -45,13 +45,13 @@ public class IntakeWheelsSubsystem extends SubsystemBase {
   public void intakeIn() {
     // conversion of RPM to RPS
     intakeMotor.setControl(
-        m_velocityRequest.withVelocity(IntakeConstants.Wheels.INTAKE_RPM * 60.0));
+        m_velocityRequest.withVelocity(IntakeConstants.Wheels.INTAKE_RPM / 60.0));
   }
 
   public void intakeOut() {
     // conversion of RPM to RPS
     intakeMotor.setControl(
-        m_velocityRequest.withVelocity(IntakeConstants.Wheels.INTAKEOUT_RPM * 60.0));
+        m_velocityRequest.withVelocity(IntakeConstants.Wheels.INTAKEOUT_RPM / 60.0));
   }
 
   public void stop() {

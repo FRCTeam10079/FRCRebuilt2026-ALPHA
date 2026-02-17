@@ -5,7 +5,8 @@
 package frc.robot;
 
 /**
- * Constants for FRC 2026 REBUILT season Contains game-specific values, timing, and robot
+ * Constants for FRC 2026 REBUILT season Contains game-specific values, timing,
+ * and robot
  * configuration
  */
 public final class Constants {
@@ -49,8 +50,7 @@ public final class Constants {
     // ==================== SPEEDS ====================
     // These are the ABSOLUTE maximums - derived from TunerConstants.kSpeedAt12Volts
     // The robot physically cannot exceed these values
-    public static final double MAX_SPEED_MPS =
-        10.0; // The theoretical possible maximum translation speed is 10.81
+    public static final double MAX_SPEED_MPS = 10.0; // The theoretical possible maximum translation speed is 10.81
     // m/s - from TunerConstants
     public static final double MAX_ANGULAR_RATE_RAD_PER_SEC = Math.PI * 2.0; // 360 deg/s
     // ==================== SPEED COEFFICIENTS ====================
@@ -102,7 +102,9 @@ public final class Constants {
   /**
    * Shooter constants
    *
-   * <p>Hardware: 2x Kraken X60 (TalonFX) on CANivore bus Configuration: Counter-rotating flywheels
+   * <p>
+   * Hardware: 2x Kraken X60 (TalonFX) on CANivore bus Configuration:
+   * Counter-rotating flywheels
    * (slave inverted)
    */
   public static final class ShooterConstants {
@@ -147,8 +149,11 @@ public final class Constants {
   /**
    * Heading Controller constants
    *
-   * <p>These control the swerve heading lock behavior. SNAP mode: Higher gains for quickly rotating
-   * to a target MAINTAIN mode: Lower gains for holding position with minimal oscillation
+   * <p>
+   * These control the swerve heading lock behavior. SNAP mode: Higher gains for
+   * quickly rotating
+   * to a target MAINTAIN mode: Lower gains for holding position with minimal
+   * oscillation
    */
   public static final class HeadingControllerConstants {
     // SNAP mode gains - aggressive to quickly reach target heading
@@ -210,8 +215,7 @@ public final class Constants {
     // These scale with distance and inversely with tag count
     // Formula: stdDev = coefficient * (distance^1.2) / (tagCount^2.0)
     public static final double XY_STD_DEV_COEFFICIENT = 0.01; // Base XY standard deviation
-    public static final double THETA_STD_DEV_COEFFICIENT =
-        0.03; // Base theta standard deviation (not used with
+    public static final double THETA_STD_DEV_COEFFICIENT = 0.03; // Base theta standard deviation (not used with
     // MegaTag2)
 
     // Maximum angular velocity for valid vision measurements (degrees/sec)
@@ -259,21 +263,43 @@ public final class Constants {
     public static final int IMU_MODE_INTERNAL_EXTERNAL_ASSIST = 4;
 
     // IMU assist alpha for complementary filter (modes 3 and 4)
-    public static final double IMU_ASSIST_ALPHA =
-        0.001; // Higher = faster convergence to assist source
+    public static final double IMU_ASSIST_ALPHA = 0.001; // Higher = faster convergence to assist source
   }
 
   public static final class IndexerConstants {
+    public static final int kFeederMotorID = 20;
+    public static final int kSpindexerMotorID = 15;
 
-    public static final int kFeederMotorID = 20; // This ID confirmed
-    public static final int kSpindexerMotorID = 15; // This id not confirmed
+    // Safety
+    public static final int kCurrentLimit = 40; // Amps
 
-    // Safety Limits
-    public static final int kCurrentLimit = 40;
+    // ==================== FEEDER PID GAINS ====================
+    public static final double kFeederKP = 0.2;
+    public static final double kFeederKI = 0.0;
+    public static final double kFeederKD = 0.0;
+    public static final double kFeederKS = 0.15;
+    public static final double kFeederKV = 0.12;
+    public static final double kFeederKA = 0.01;
 
-    // Speeds (-1.0 to 1.0)
-    public static final double kForwardSpeed = 0.5;
-    public static final double kReverseSpeed = -0.5;
+    public static final double kFeederKG = 0.0;
+
+    // ==================== SPINDEXER PID GAINS ====================
+    public static final double kSpindexerKP = 0.3;
+    public static final double kSpindexerKI = 0.0;
+    public static final double kSpindexerKD = 0.0;
+    public static final double kSpindexerKS = 0.2;
+    public static final double kSpindexerKV = 0.12;
+    public static final double kSpindexerKA = 0.01;
+    public static final double kSpindexerKG = 0.0;
+
+    // ==================== TARGET SPEEDS (RPM) ====================
+    // Feeder (Fast)
+    public static final double kFeederTargetRPM = 3000;
+    public static final double kFeederReverseRPM = -1000;
+
+    // Spindexer (Slow/Torque)
+    public static final double kSpindexerTargetRPM = 1000;
+    public static final double kSpindexerReverseRPM = -1000;
   }
   // ==================== UTILITY METHODS ====================
 
@@ -317,56 +343,57 @@ public final class Constants {
   /**
    * AprilTag positions on the field
    *
-   * <p>Format: HashMap<TagID, double[]{X_inches, Y_inches, Z_inches, Yaw_degrees, Pitch_degrees}>
+   * <p>
+   * Format: HashMap<TagID, double[]{X_inches, Y_inches, Z_inches, Yaw_degrees,
+   * Pitch_degrees}>
    */
   public static final class AprilTagMaps {
-    public static final java.util.HashMap<Integer, double[]> aprilTagMap =
-        new java.util.HashMap<>();
+    public static final java.util.HashMap<Integer, double[]> aprilTagMap = new java.util.HashMap<>();
 
     static {
       // 2026 REBUILT Field - Welded Perimeter
       // Format: {X, Y, Z, Yaw, Pitch}
-      aprilTagMap.put(1, new double[] {467.64, 292.31, 35.00, 180.0, 0.0}); // Trench, Red
-      aprilTagMap.put(2, new double[] {469.11, 182.60, 44.25, 90.0, 0.0}); // Hub, Red
-      aprilTagMap.put(3, new double[] {445.35, 172.84, 44.25, 180.0, 0.0}); // Hub, Red
-      aprilTagMap.put(4, new double[] {445.35, 158.84, 44.25, 180.0, 0.0}); // Hub, Red
-      aprilTagMap.put(5, new double[] {469.11, 135.09, 44.25, 270.0, 0.0}); // Hub, Red
-      aprilTagMap.put(6, new double[] {467.64, 25.37, 35.00, 180.0, 0.0}); // Trench, Red
-      aprilTagMap.put(7, new double[] {470.59, 25.37, 35.00, 0.0, 0.0}); // Trench, Red
-      aprilTagMap.put(8, new double[] {483.11, 135.09, 44.25, 270.0, 0.0}); // Hub, Red
-      aprilTagMap.put(9, new double[] {492.88, 144.84, 44.25, 0.0, 0.0}); // Hub, Red
-      aprilTagMap.put(10, new double[] {492.88, 158.84, 44.25, 0.0, 0.0}); // Hub, Red
-      aprilTagMap.put(11, new double[] {483.11, 182.60, 44.25, 90.0, 0.0}); // Hub, Red
-      aprilTagMap.put(12, new double[] {470.59, 292.31, 35.00, 0.0, 0.0}); // Trench, Red
-      aprilTagMap.put(13, new double[] {650.92, 291.47, 21.75, 180.0, 0.0}); // Outpost, Red
-      aprilTagMap.put(14, new double[] {650.92, 274.47, 21.75, 180.0, 0.0}); // Outpost, Red
-      aprilTagMap.put(15, new double[] {650.90, 170.22, 21.75, 180.0, 0.0}); // Tower, Red
-      aprilTagMap.put(16, new double[] {650.90, 153.22, 21.75, 180.0, 0.0}); // Tower, Red
-      aprilTagMap.put(17, new double[] {183.59, 25.37, 35.00, 0.0, 0.0}); // Trench, Blue
-      aprilTagMap.put(18, new double[] {182.11, 135.09, 44.25, 270.0, 0.0}); // Hub, Blue
-      aprilTagMap.put(19, new double[] {205.87, 144.84, 44.25, 0.0, 0.0}); // Hub, Blue
-      aprilTagMap.put(20, new double[] {205.87, 158.84, 44.25, 0.0, 0.0}); // Hub, Blue
-      aprilTagMap.put(21, new double[] {182.11, 182.60, 44.25, 90.0, 0.0}); // Hub, Blue
-      aprilTagMap.put(22, new double[] {183.59, 292.31, 35.00, 0.0, 0.0}); // Trench, Blue
-      aprilTagMap.put(23, new double[] {180.64, 292.31, 35.00, 180.0, 0.0}); // Trench, Blue
-      aprilTagMap.put(24, new double[] {168.11, 182.60, 44.25, 90.0, 0.0}); // Hub, Blue
-      aprilTagMap.put(25, new double[] {158.34, 172.84, 44.25, 180.0, 0.0}); // Hub, Blue
-      aprilTagMap.put(26, new double[] {158.34, 158.84, 44.25, 180.0, 0.0}); // Hub, Blue
-      aprilTagMap.put(27, new double[] {168.11, 135.09, 44.25, 270.0, 0.0}); // Hub, Blue
-      aprilTagMap.put(28, new double[] {180.64, 25.37, 35.00, 180.0, 0.0}); // Trench, Blue
-      aprilTagMap.put(29, new double[] {0.30, 26.22, 21.75, 0.0, 0.0}); // Outpost, Blue
-      aprilTagMap.put(30, new double[] {0.30, 43.22, 21.75, 0.0, 0.0}); // Outpost, Blue
-      aprilTagMap.put(31, new double[] {0.32, 147.47, 21.75, 0.0, 0.0}); // Tower, Blue
-      aprilTagMap.put(32, new double[] {0.32, 164.47, 21.75, 0.0, 0.0}); // Tower, Blue
+      aprilTagMap.put(1, new double[] { 467.64, 292.31, 35.00, 180.0, 0.0 }); // Trench, Red
+      aprilTagMap.put(2, new double[] { 469.11, 182.60, 44.25, 90.0, 0.0 }); // Hub, Red
+      aprilTagMap.put(3, new double[] { 445.35, 172.84, 44.25, 180.0, 0.0 }); // Hub, Red
+      aprilTagMap.put(4, new double[] { 445.35, 158.84, 44.25, 180.0, 0.0 }); // Hub, Red
+      aprilTagMap.put(5, new double[] { 469.11, 135.09, 44.25, 270.0, 0.0 }); // Hub, Red
+      aprilTagMap.put(6, new double[] { 467.64, 25.37, 35.00, 180.0, 0.0 }); // Trench, Red
+      aprilTagMap.put(7, new double[] { 470.59, 25.37, 35.00, 0.0, 0.0 }); // Trench, Red
+      aprilTagMap.put(8, new double[] { 483.11, 135.09, 44.25, 270.0, 0.0 }); // Hub, Red
+      aprilTagMap.put(9, new double[] { 492.88, 144.84, 44.25, 0.0, 0.0 }); // Hub, Red
+      aprilTagMap.put(10, new double[] { 492.88, 158.84, 44.25, 0.0, 0.0 }); // Hub, Red
+      aprilTagMap.put(11, new double[] { 483.11, 182.60, 44.25, 90.0, 0.0 }); // Hub, Red
+      aprilTagMap.put(12, new double[] { 470.59, 292.31, 35.00, 0.0, 0.0 }); // Trench, Red
+      aprilTagMap.put(13, new double[] { 650.92, 291.47, 21.75, 180.0, 0.0 }); // Outpost, Red
+      aprilTagMap.put(14, new double[] { 650.92, 274.47, 21.75, 180.0, 0.0 }); // Outpost, Red
+      aprilTagMap.put(15, new double[] { 650.90, 170.22, 21.75, 180.0, 0.0 }); // Tower, Red
+      aprilTagMap.put(16, new double[] { 650.90, 153.22, 21.75, 180.0, 0.0 }); // Tower, Red
+      aprilTagMap.put(17, new double[] { 183.59, 25.37, 35.00, 0.0, 0.0 }); // Trench, Blue
+      aprilTagMap.put(18, new double[] { 182.11, 135.09, 44.25, 270.0, 0.0 }); // Hub, Blue
+      aprilTagMap.put(19, new double[] { 205.87, 144.84, 44.25, 0.0, 0.0 }); // Hub, Blue
+      aprilTagMap.put(20, new double[] { 205.87, 158.84, 44.25, 0.0, 0.0 }); // Hub, Blue
+      aprilTagMap.put(21, new double[] { 182.11, 182.60, 44.25, 90.0, 0.0 }); // Hub, Blue
+      aprilTagMap.put(22, new double[] { 183.59, 292.31, 35.00, 0.0, 0.0 }); // Trench, Blue
+      aprilTagMap.put(23, new double[] { 180.64, 292.31, 35.00, 180.0, 0.0 }); // Trench, Blue
+      aprilTagMap.put(24, new double[] { 168.11, 182.60, 44.25, 90.0, 0.0 }); // Hub, Blue
+      aprilTagMap.put(25, new double[] { 158.34, 172.84, 44.25, 180.0, 0.0 }); // Hub, Blue
+      aprilTagMap.put(26, new double[] { 158.34, 158.84, 44.25, 180.0, 0.0 }); // Hub, Blue
+      aprilTagMap.put(27, new double[] { 168.11, 135.09, 44.25, 270.0, 0.0 }); // Hub, Blue
+      aprilTagMap.put(28, new double[] { 180.64, 25.37, 35.00, 180.0, 0.0 }); // Trench, Blue
+      aprilTagMap.put(29, new double[] { 0.30, 26.22, 21.75, 0.0, 0.0 }); // Outpost, Blue
+      aprilTagMap.put(30, new double[] { 0.30, 43.22, 21.75, 0.0, 0.0 }); // Outpost, Blue
+      aprilTagMap.put(31, new double[] { 0.32, 147.47, 21.75, 0.0, 0.0 }); // Tower, Blue
+      aprilTagMap.put(32, new double[] { 0.32, 164.47, 21.75, 0.0, 0.0 }); // Tower, Blue
     }
 
     // Red side tag IDs (for direction flipping logic)
-    public static final int[] RED_SIDE_TAGS = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
+    public static final int[] RED_SIDE_TAGS = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16
     };
 
     // Blue side tag IDs
     public static final int[] BLUE_SIDE_TAGS = {
-      17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
+        17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32
     };
   }
 

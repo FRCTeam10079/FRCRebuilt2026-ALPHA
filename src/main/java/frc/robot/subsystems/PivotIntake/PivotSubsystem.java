@@ -1,18 +1,24 @@
 package frc.robot.subsystems.PivotIntake;
 
 import com.ctre.phoenix6.configs.TalonFXConfiguration;
+import com.ctre.phoenix6.controls.NeutralOut;
 import com.ctre.phoenix6.controls.PositionVoltage;
 import com.ctre.phoenix6.hardware.TalonFX;
 import com.ctre.phoenix6.signals.GravityTypeValue;
 import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
+
+import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.IntakeConstants;
+import frc.robot.lib.NetworkedLib.NetworkedTalonFX;
 
 public class PivotSubsystem extends SubsystemBase {
 
-  private final TalonFX pivotMotor = new TalonFX(IntakeConstants.Pivot.MOTOR_ID, "rio");
+  private final NetworkedTalonFX pivotMotor = new NetworkedTalonFX(IntakeConstants.Pivot.MOTOR_ID, "rio");
   private double pivotSetpoint = IntakeConstants.Pivot.STOWED_POSITION;
+  private PositionVoltage m_positionVoltage = new PositionVoltage(pivotSetpoint);
+  private NeutralOut m_neutralVoltage = new NeutralOut();
 
   public PivotSubsystem() {
     configurePivotMotor();
@@ -33,7 +39,8 @@ public class PivotSubsystem extends SubsystemBase {
         .withKI(IntakeConstants.Pivot.KI)
         .withKP(IntakeConstants.Pivot.KP);
 
-    config.Feedback.SensorToMechanismRatio = IntakeConstants.Pivot.SENSOR_MECHANISM_RATIO;
+    // config.Feedback.SensorToMechanismRatio =
+    // IntakeConstants.Pivot.SENSOR_MECHANISM_RATIO;
 
     config.CurrentLimits.SupplyCurrentLimit = IntakeConstants.Pivot.SUPPLY_CURRENT_LIMIT;
     config.CurrentLimits.SupplyCurrentLimitEnable = true;
@@ -44,11 +51,12 @@ public class PivotSubsystem extends SubsystemBase {
     config.SoftwareLimitSwitch.ReverseSoftLimitThreshold = IntakeConstants.Pivot.STOWED_POSITION;
     config.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
 
-    pivotMotor.getConfigurator().apply(config);
+    pivotMotor.applyConfiguration(config);
   }
 
   public void setPivotPosition(double position) {
     pivotSetpoint = position;
+    m_positionVoltage = m_positionVoltage.withPosition(pivotSetpoint);
   }
 
   public void deployPivot() {
@@ -59,9 +67,9 @@ public class PivotSubsystem extends SubsystemBase {
     setPivotPosition(IntakeConstants.Pivot.STOWED_POSITION);
   }
 
-  public boolean isDeployed() {
-    return Math.abs(getPivotPosition() - IntakeConstants.Pivot.INTAKE_POSITION)
-        < IntakeConstants.Pivot.DEPLOY_TOLERANCE;
+  public boolean reachedSetpoint() {
+    return Math.abs(Math
+        .abs(getPivotPosition()) - Math.abs(pivotSetpoint)) < IntakeConstants.Pivot.DEPLOY_TOLERANCE;
   }
 
   public double getPivotPosition() {
@@ -70,7 +78,15 @@ public class PivotSubsystem extends SubsystemBase {
 
   @Override
   public void periodic() {
-    PositionVoltage request = new PositionVoltage(pivotSetpoint).withSlot(0);
-    pivotMotor.setControl(request);
+    pivotMotor.periodic();
+    if (reachedSetpoint()) {
+      pivotMotor.setControl(m_neutralVoltage);
+    } else {
+      pivotMotor.setControl(m_positionVoltage);
+    }
+
+    SmartDashboard.putNumber("Pivot/setpoint", pivotSetpoint);
+    SmartDashboard.putNumber("Pivot/position", getPivotPosition());
+    SmartDashboard.putBoolean("Pivot/reachedSetpoint?", reachedSetpoint());
   }
 }

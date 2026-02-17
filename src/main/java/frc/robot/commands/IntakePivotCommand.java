@@ -20,14 +20,16 @@ public class IntakePivotCommand extends Command {
   }
 
   @Override
-  public void execute() {}
+  public void execute() {
+  }
 
   @Override
-  public void end(boolean interrupted) {}
+  public void end(boolean interrupted) {
+  }
 
   /** Only finishes once deployed completely */
   @Override
   public boolean isFinished() {
-    return pivot.isDeployed();
+    return pivot.reachedSetpoint();
   }
 }

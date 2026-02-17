@@ -11,11 +11,10 @@ import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants.IntakeConstants;
-import frc.robot.lib.NetworkedLib.NetworkedTalonFX;
 
 public class PivotSubsystem extends SubsystemBase {
 
-  private final NetworkedTalonFX pivotMotor = new NetworkedTalonFX(IntakeConstants.Pivot.MOTOR_ID, "rio");
+  private final TalonFX pivotMotor = new TalonFX(IntakeConstants.Pivot.MOTOR_ID, "rio");
   private double pivotSetpoint = IntakeConstants.Pivot.STOWED_POSITION;
   private PositionVoltage m_positionVoltage = new PositionVoltage(pivotSetpoint);
   private NeutralOut m_neutralVoltage = new NeutralOut();
@@ -51,7 +50,7 @@ public class PivotSubsystem extends SubsystemBase {
     config.SoftwareLimitSwitch.ReverseSoftLimitThreshold = IntakeConstants.Pivot.STOWED_POSITION;
     config.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
 
-    pivotMotor.applyConfiguration(config);
+    pivotMotor.getConfigurator().apply(config);
   }
 
   public void setPivotPosition(double position) {
@@ -78,7 +77,6 @@ public class PivotSubsystem extends SubsystemBase {
 
   @Override
   public void periodic() {
-    pivotMotor.periodic();
     if (reachedSetpoint()) {
       pivotMotor.setControl(m_neutralVoltage);
     } else {

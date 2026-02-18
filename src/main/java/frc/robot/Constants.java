@@ -99,7 +99,7 @@ public final class Constants {
       public static final int MOTOR_ID = 24;
 
       public static final double INTAKE_POSITION = 2;
-      public static final double STOWED_POSITION = 8.37;
+      public static final double STOWED_POSITION = 7;
 
       public static final int SUPPLY_CURRENT_LIMIT = 40;
       public static final int STATOR_CURRENT_LIMIT = 80;
@@ -154,7 +154,7 @@ public final class Constants {
 
     // Target RPM values
     public static final double SHOOTER_IDLE_RPM = 0;
-    public static final double SHOOTER_SPINUP_RPM = 1000; // Default spin-up target
+    public static final double SHOOTER_SPINUP_RPM = 2100; // Default spin-up target
     public static final double SHOOTER_MAX_RPM = 5500; // Kraken X60 free speed ~6000 RPM
 
     // RPM tolerance for "at setpoint" check
@@ -167,7 +167,7 @@ public final class Constants {
     // These values need to be tuned!
     public static final double SHOOTER_KS = 0.15; // Static friction compensation
     public static final double SHOOTER_KV = 0.12; // Velocity feedforward (main term)
-    public static final double SHOOTER_KP = 0.3; // Proportional gain for error correction
+    public static final double SHOOTER_KP = 0.5; // Proportional gain for error correction
 
     // Feeder speed when firing
     public static final double FEEDER_SPEED = 1.0;
@@ -309,18 +309,18 @@ public final class Constants {
   }
 
   public static final class IndexerConstants {
-    public static final int kFeederMotorID = 20;
-    public static final int kSpindexerMotorID = 15;
+    public static final int kFeederMotorID = 15;
+    public static final int kSpindexerMotorID = 21;
 
     // Safety
     public static final int kCurrentLimit = 40; // Amps
 
     // ==================== FEEDER PID GAINS ====================
-    public static final double kFeederKP = 0.2;
+    public static final double kFeederKP = 0.5;
     public static final double kFeederKI = 0.0;
     public static final double kFeederKD = 0.0;
-    public static final double kFeederKS = 0.15;
-    public static final double kFeederKV = 0.12;
+    public static final double kFeederKS = 0.5;
+    public static final double kFeederKV = 0.3;
     public static final double kFeederKA = 0.01;
 
     public static final double kFeederKG = 0.0;
@@ -337,11 +337,11 @@ public final class Constants {
     // ==================== TARGET SPEEDS (RPM) ====================
     // Feeder (Fast)
     public static final double kFeederTargetRPM = 3000;
-    public static final double kFeederReverseRPM = -1000;
+    public static final double kFeederReverseRPM = -3000;
 
     // Spindexer (Slow/Torque)
-    public static final double kSpindexerTargetRPM = 1000;
-    public static final double kSpindexerReverseRPM = -1000;
+    public static final double kSpindexerTargetRPM = 5000;
+    public static final double kSpindexerReverseRPM = -5000;
   }
   // ==================== UTILITY METHODS ====================
 

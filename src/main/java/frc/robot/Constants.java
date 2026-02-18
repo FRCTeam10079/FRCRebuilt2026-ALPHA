@@ -98,8 +98,8 @@ public final class Constants {
     public static final class Pivot {
       public static final int MOTOR_ID = 24;
 
-      public static final double INTAKE_POSITION = 2;
-      public static final double STOWED_POSITION = 7;
+      public static final double INTAKE_POSITION = 6;
+      public static final double STOWED_POSITION = 0;
 
       public static final int SUPPLY_CURRENT_LIMIT = 40;
       public static final int STATOR_CURRENT_LIMIT = 80;
@@ -110,32 +110,32 @@ public final class Constants {
 
       // TUNE ALL:
       public static final double KA = 0;
-      public static final double KS = 0.32;
-      public static final double KG = 0.0;
-      public static final double KP = 1;
-      public static final double KI = 0.2;
-      public static final double KD = 0;
+      public static final double KS = 0.4;
+      public static final double KG = 0;
+      public static final double KP = 1.4;
+      public static final double KI = 0.05;
+      public static final double KD = 0.1;
       public static final double KV = 0;
     }
 
     public static final class Wheels {
-      public static final int MOTOR_ID = 15;
+      public static final int MOTOR_ID = 19;
 
       public static final int SUPPLY_CURRENT_LIMIT = 40;
       public static final int STATOR_CURRENT_LIMIT = 80;
 
       // extremely slow for testing, ramp up for actual
-      public static final double INTAKE_IN_RPM = 60;
-      public static final double INTAKE_OUT_RPM = -60;
+      public static final double INTAKE_IN_RPM = 4000;
+      public static final double INTAKE_OUT_RPM = -4000;
 
       // TUNE ALL: (SysId could work well here, though it's not that important to be
       // super accurate)
       public static final double KA = 0;
-      public static final double KS = 0;
-      public static final double KP = 0;
+      public static final double KS = 0.1;
+      public static final double KP = 0.3;
       public static final double KI = 0;
       public static final double KD = 0;
-      public static final double KV = 0;
+      public static final double KV = 0.5;
     }
   }
 

@@ -23,6 +23,8 @@ public class PivotSubsystem extends SubsystemBase {
   public PivotSubsystem() {
     configurePivotMotor();
 
+    pivotMotor.setPosition(IntakeConstants.Pivot.STOWED_POSITION);
+
     // this stops pivot from trying to move immediately (set to pivot position)
     pivotSetpoint = getPivotPosition();
   }
@@ -49,10 +51,10 @@ public class PivotSubsystem extends SubsystemBase {
     config.CurrentLimits.SupplyCurrentLimitEnable = true;
 
     config.SoftwareLimitSwitch.ForwardSoftLimitThreshold = IntakeConstants.Pivot.INTAKE_POSITION;
-    config.SoftwareLimitSwitch.ForwardSoftLimitEnable = false;
+    config.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
 
     config.SoftwareLimitSwitch.ReverseSoftLimitThreshold = IntakeConstants.Pivot.STOWED_POSITION;
-    config.SoftwareLimitSwitch.ReverseSoftLimitEnable = false;
+    config.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
 
     pivotMotor.applyConfiguration(config);
   }

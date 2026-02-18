@@ -27,8 +27,9 @@ import frc.robot.generated.TunerConstants;
 import frc.robot.pathfinding.Pathfinding;
 import frc.robot.subsystems.CommandSwerveDrivetrain;
 import frc.robot.subsystems.IndexerSubsystem;
-import frc.robot.subsystems.IntakeSubsystem;
 import frc.robot.subsystems.LimelightSubsystem;
+import frc.robot.subsystems.PivotIntake.IntakeWheelsSubsystem;
+import frc.robot.subsystems.PivotIntake.PivotSubsystem;
 import frc.robot.subsystems.ShooterSubsystem;
 
 /**
@@ -54,8 +55,11 @@ public class RobotContainer {
   private final IndexerSubsystem indexer = new IndexerSubsystem();
 
   // Mechanisms
-  public final IntakeSubsystem intake = new IntakeSubsystem();
+
   public final ShooterSubsystem shooter = new ShooterSubsystem();
+  // Intake
+  private final IntakeWheelsSubsystem intake = new IntakeWheelsSubsystem();
+  private final PivotSubsystem pivot = new PivotSubsystem();
 
   private final Telemetry m_telemetry =
       new Telemetry(TunerConstants.kSpeedAt12Volts.in(MetersPerSecond));
@@ -298,9 +302,28 @@ public class RobotContainer {
 
     // ==================== OPERATOR CONTROLS ====================
     // TODO: Add intake controls
-    m_driverController
+    // Intake In
+    m_operatorController
         .x()
         .toggleOnTrue(new StartEndCommand(() -> intake.intakeIn(), () -> intake.stop(), intake));
+    // Intake Out
+    m_operatorController
+        .a()
+        .toggleOnTrue(new StartEndCommand(() -> intake.intakeOut(), () -> intake.stop(), intake));
+    // Deploy Pivot Controls
+    m_operatorController
+        .rightBumper()
+        .toggleOnTrue(new StartEndCommand(
+            () -> pivot.deployPivot(), // action when button pressed
+            () -> {}, // nothing special on release
+            pivot));
+    // Stow Pivot Controls
+    m_operatorController
+        .leftBumper()
+        .toggleOnTrue(new StartEndCommand(
+            () -> pivot.stowPivot(), // action when button pressed
+            () -> {}, // nothing special on release
+            pivot));
     // TODO: Add climb controls
 
     // ==================== PATHFINDING CONTROLS ====================

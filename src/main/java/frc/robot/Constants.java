@@ -4,11 +4,15 @@
 
 package frc.robot;
 
+import com.ctre.phoenix6.CANBus;
+
 /**
  * Constants for FRC 2026 REBUILT season Contains game-specific values, timing, and robot
  * configuration
  */
 public final class Constants {
+
+  public static final CANBus kCANBus = new CANBus("rio");
 
   /** Game timing constants for REBUILT */
   public static final class GameConstants {
@@ -90,10 +94,9 @@ public final class Constants {
   }
 
   /** Intake Pivot/Wheels constants */
-  // TODO: many values in this need tuning
   public static final class IntakeConstants {
     public static final class Pivot {
-      public static final int MOTOR_ID = 24; // Not Real ID
+      public static final int MOTOR_ID = 24;
 
       public static final double INTAKE_POSITION = 0.3;
       public static final double STOWED_POSITION = -6.5;
@@ -121,10 +124,11 @@ public final class Constants {
       public static final int SUPPLY_CURRENT_LIMIT = 40;
       public static final int STATOR_CURRENT_LIMIT = 80;
 
-      public static final double INTAKE_RPM = 60;
-      public static final double INTAKEOUT_RPM = -60;
+      // extremely slow for testing, ramp up for actual
+      public static final double INTAKE_IN_RPM = 60;
+      public static final double INTAKE_OUT_RPM = -60;
 
-      // TUNE ALL:
+      // TUNE ALL: (SysId could work well here, though it's not that important to be super accurate)
       public static final double KA = 0;
       public static final double KS = 0;
       public static final double KP = 0;

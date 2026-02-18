@@ -9,14 +9,15 @@ import com.ctre.phoenix6.signals.InvertedValue;
 import com.ctre.phoenix6.signals.NeutralModeValue;
 import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
+import frc.robot.Constants;
 import frc.robot.Constants.IntakeConstants;
 
 public class PivotSubsystem extends SubsystemBase {
 
-  private final TalonFX pivotMotor = new TalonFX(IntakeConstants.Pivot.MOTOR_ID, "rio");
+  private final TalonFX pivotMotor = new TalonFX(IntakeConstants.Pivot.MOTOR_ID, Constants.kCANBus);
   private double pivotSetpoint = IntakeConstants.Pivot.STOWED_POSITION;
-  private PositionVoltage m_positionVoltage = new PositionVoltage(pivotSetpoint);
-  private NeutralOut m_neutralVoltage = new NeutralOut();
+  private final PositionVoltage m_positionVoltage = new PositionVoltage(pivotSetpoint);
+  private final NeutralOut m_neutralVoltage = new NeutralOut();
 
   public PivotSubsystem() {
     configurePivotMotor();
@@ -28,7 +29,7 @@ public class PivotSubsystem extends SubsystemBase {
     config.MotorOutput.NeutralMode = NeutralModeValue.Brake;
     config.MotorOutput.Inverted = InvertedValue.Clockwise_Positive;
     // PID constants
-    config.Slot0 = config.Slot0.withGravityType(GravityTypeValue.Arm_Cosine)
+    config.Slot0.withGravityType(GravityTypeValue.Arm_Cosine)
         .withKA(IntakeConstants.Pivot.KA)
         .withKV(IntakeConstants.Pivot.KV)
         .withKD(IntakeConstants.Pivot.KD)
@@ -54,7 +55,7 @@ public class PivotSubsystem extends SubsystemBase {
 
   public void setPivotPosition(double position) {
     pivotSetpoint = position;
-    m_positionVoltage = m_positionVoltage.withPosition(pivotSetpoint);
+    m_positionVoltage.withPosition(pivotSetpoint);
   }
 
   public void deployPivot() {

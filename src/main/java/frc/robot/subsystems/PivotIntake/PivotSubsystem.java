@@ -11,10 +11,11 @@ import edu.wpi.first.wpilibj.smartdashboard.SmartDashboard;
 import edu.wpi.first.wpilibj2.command.SubsystemBase;
 import frc.robot.Constants;
 import frc.robot.Constants.IntakeConstants;
+import frc.robot.lib.NetworkedLib.NetworkedTalonFX;
 
 public class PivotSubsystem extends SubsystemBase {
 
-  private final TalonFX pivotMotor = new TalonFX(IntakeConstants.Pivot.MOTOR_ID, Constants.kCANBus);
+  private final NetworkedTalonFX pivotMotor = new NetworkedTalonFX(IntakeConstants.Pivot.MOTOR_ID, Constants.kCANBus);
   private double pivotSetpoint = IntakeConstants.Pivot.STOWED_POSITION;
   private final PositionVoltage m_positionVoltage = new PositionVoltage(pivotSetpoint);
   private final NeutralOut m_neutralVoltage = new NeutralOut();
@@ -45,12 +46,12 @@ public class PivotSubsystem extends SubsystemBase {
     config.CurrentLimits.SupplyCurrentLimitEnable = true;
 
     config.SoftwareLimitSwitch.ForwardSoftLimitThreshold = IntakeConstants.Pivot.INTAKE_POSITION;
-    config.SoftwareLimitSwitch.ForwardSoftLimitEnable = true;
+    config.SoftwareLimitSwitch.ForwardSoftLimitEnable = false;
 
     config.SoftwareLimitSwitch.ReverseSoftLimitThreshold = IntakeConstants.Pivot.STOWED_POSITION;
-    config.SoftwareLimitSwitch.ReverseSoftLimitEnable = true;
+    config.SoftwareLimitSwitch.ReverseSoftLimitEnable = false;
 
-    pivotMotor.getConfigurator().apply(config);
+    pivotMotor.applyConfiguration(config);
   }
 
   public void setPivotPosition(double position) {
@@ -67,8 +68,7 @@ public class PivotSubsystem extends SubsystemBase {
   }
 
   public boolean reachedSetpoint() {
-    return Math.abs(Math.abs(getPivotPosition()) - Math.abs(pivotSetpoint))
-        < IntakeConstants.Pivot.DEPLOY_TOLERANCE;
+    return Math.abs(Math.abs(getPivotPosition()) - Math.abs(pivotSetpoint)) < IntakeConstants.Pivot.DEPLOY_TOLERANCE;
   }
 
   public double getPivotPosition() {
@@ -77,10 +77,11 @@ public class PivotSubsystem extends SubsystemBase {
 
   @Override
   public void periodic() {
+    pivotMotor.periodic();
     if (reachedSetpoint()) {
       pivotMotor.setControl(m_neutralVoltage);
     } else {
-      pivotMotor.setControl(m_positionVoltage);
+      pivotMotor.setControl(m_positionVoltage.withPosition(pivotSetpoint));
     }
 
     SmartDashboard.putNumber("Pivot/setpoint", pivotSetpoint);

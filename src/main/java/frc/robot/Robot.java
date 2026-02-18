@@ -13,7 +13,8 @@ import edu.wpi.first.wpilibj2.command.CommandScheduler;
 import frc.robot.Constants.VisionConstants;
 
 /**
- * Robot class for FRC 2026 REBUILT season Integrates with the Master State Machine for
+ * Robot class for FRC 2026 REBUILT season Integrates with the Master State
+ * Machine for
  * comprehensive robot control
  */
 public class Robot extends TimedRobot {
@@ -70,7 +71,10 @@ public class Robot extends TimedRobot {
     // This ensures the IMU is synchronized before the match starts
     LimelightHelpers.SetIMUMode(
         VisionConstants.LIMELIGHT_NAME, VisionConstants.IMU_MODE_SEED_EXTERNAL);
-    double robotYaw = m_robotContainer.drivetrain.getState().Pose.getRotation().getDegrees();
+    // Use raw Pigeon2 yaw for seeding - NOT the fused pose estimator heading.
+    // This avoids a feedback loop where vision corrections contaminate the heading
+    // being fed back into MegaTag2.
+    double robotYaw = m_robotContainer.drivetrain.getPigeon2().getYaw().getValueAsDouble();
     LimelightHelpers.SetRobotOrientation(VisionConstants.LIMELIGHT_NAME, robotYaw, 0, 0, 0, 0, 0);
 
     // ==================== IMU SEEDING TELEMETRY ====================

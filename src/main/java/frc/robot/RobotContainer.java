@@ -118,7 +118,8 @@ public class RobotContainer {
 
   /**
    * Register all named commands for PathPlanner autonomous routines. These commands are triggered
-   * by event markers and command groups in PathPlanner auto files.
+   * by event markers and comm
+   * and groups in PathPlanner auto files.
    *
    * <p>IMPORTANT: Must be called BEFORE any PathPlannerAuto or AutoBuilder.buildAutoChooser()
    * calls.

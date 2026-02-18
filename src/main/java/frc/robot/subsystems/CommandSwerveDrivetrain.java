@@ -38,7 +38,8 @@ import java.util.function.Supplier;
 import org.littletonrobotics.junction.Logger;
 
 /**
- * Class that extends the Phoenix 6 SwerveDrivetrain class and implements Subsystem so it can easily
+ * Class that extends the Phoenix 6 SwerveDrivetrain class and implements
+ * Subsystem so it can easily
  * be used in command-based projects.
  */
 public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Subsystem {
@@ -79,8 +80,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   private double m_headingLockTarget = 0.0;
 
   /** Swerve request to apply during robot-centric path following */
-  private final SwerveRequest.ApplyRobotSpeeds m_pathApplyRobotSpeeds =
-      new SwerveRequest.ApplyRobotSpeeds();
+  private final SwerveRequest.ApplyRobotSpeeds m_pathApplyRobotSpeeds = new SwerveRequest.ApplyRobotSpeeds();
 
   // ==================== CHOREO TRAJECTORY FOLLOWER ====================
   private final PIDController m_choreoXController = new PIDController(7.0, 0.0, 0.0);
@@ -88,12 +88,9 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   private final PIDController m_choreoHeadingController = new PIDController(5.0, 0.0, 0.0);
 
   /* Swerve requests to apply during SysId characterization */
-  private final SwerveRequest.SysIdSwerveTranslation m_translationCharacterization =
-      new SwerveRequest.SysIdSwerveTranslation();
-  private final SwerveRequest.SysIdSwerveSteerGains m_steerCharacterization =
-      new SwerveRequest.SysIdSwerveSteerGains();
-  private final SwerveRequest.SysIdSwerveRotation m_rotationCharacterization =
-      new SwerveRequest.SysIdSwerveRotation();
+  private final SwerveRequest.SysIdSwerveTranslation m_translationCharacterization = new SwerveRequest.SysIdSwerveTranslation();
+  private final SwerveRequest.SysIdSwerveSteerGains m_steerCharacterization = new SwerveRequest.SysIdSwerveSteerGains();
+  private final SwerveRequest.SysIdSwerveRotation m_rotationCharacterization = new SwerveRequest.SysIdSwerveRotation();
 
   /*
    * SysId routine for characterizing translation. This is used to find PID gains
@@ -125,6 +122,14 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
       new SysIdRoutine.Mechanism(
           volts -> setControl(m_steerCharacterization.withVolts(volts)), null, this));
 
+  // ==================== VISION LOCALIZATION BOOTSTRAP ====================
+  // Tracks whether vision has ever successfully updated the pose estimator.
+  // Until this is true, the odometry-divergence check is skipped so that the
+  // very first valid vision measurement can seed the pose estimator.
+  // Without this, a robot starting at odometry (0,0) can never accept a
+  // vision pose 10+ meters away, creating a permanent rejection loop.
+  private boolean m_visionLocalized = false;
+
   // ==================== VISION DEBUG STATE ====================
   // Tracking fields for throttled console logging and change detection.
   // These let instrumentVision() detect status transitions, tag-count changes,
@@ -137,35 +142,49 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
   // ==================== VISION LOCALIZATION WITH MEGATAG2 ====================
   /**
-   * Updates robot pose estimation using Limelight MegaTag2 vision measurements. This method: 1.
-   * Sets robot orientation for MegaTag2 (required before reading pose) 2. Reads MegaTag2 pose
-   * estimate 3. Validates the pose (field bounds, tag count, angular velocity) 4. Calculates
-   * dynamic standard deviations based on distance and tag count 5. Adds the measurement to the pose
-   * estimator
+   * Updates robot pose estimation using Limelight MegaTag2 vision measurements.
+   * Validation chain
+   * (ordered cheapest-first): 1. Null / stale timestamp / no tags 2. Single-tag
+   * ambiguity gate 3.
+   * Angular velocity rejection 4. Max tag distance rejection 5. Min tag area
+   * rejection 6. Field
+   * boundary check 7. Odometry divergence check (with first-time bootstrap)
+   *
+   * <p>
+   * Standard deviations are computed via a distance-based interpolating lookup
+   * table (see {@link
+   * frc.robot.Constants.VisionConstants#interpolateStdDev}).
    */
   private void updateVision() {
     var driveState = getState();
-    double headingDeg = driveState.Pose.getRotation().getDegrees();
-    double angularVelocityDegPerSec = Math.toDegrees(driveState.Speeds.omegaRadiansPerSecond);
     Pose2d odoPose = driveState.Pose;
 
-    // Log that vision update is running
-    SmartDashboard.putNumber("Vision/HeadingDeg", headingDeg);
+    // ==================== RAW PIGEON2 HEADING FOR MEGATAG2 ====================
+    // IMPORTANT: Use the raw Pigeon2 yaw, NOT the fused pose estimator heading.
+    // Using getState().Pose.getRotation() creates a feedback loop: MegaTag2 feeds
+    // into the pose estimator, which feeds back into SetRobotOrientation(), which
+    // feeds into MegaTag2 again. If MT2 produces a slightly wrong pose, the error
+    // amplifies until the pose flips to the opposite side of the field.
+    double rawPigeonYaw = getPigeon2().getYaw().getValueAsDouble();
+    double rawPigeonAngularVel = getPigeon2().getAngularVelocityZWorld().getValueAsDouble();
+    double fusedHeadingDeg = odoPose.getRotation().getDegrees();
+
+    // Log both headings for diagnostic comparison
+    SmartDashboard.putNumber("Vision/RawPigeonYaw", rawPigeonYaw);
+    SmartDashboard.putNumber("Vision/FusedHeadingDeg", fusedHeadingDeg);
+    SmartDashboard.putNumber("Vision/HeadingDelta", rawPigeonYaw - fusedHeadingDeg);
 
     // Set robot orientation BEFORE reading MegaTag2 pose
-    // This is required for MegaTag2 to work correctly
     LimelightHelpers.SetRobotOrientation(
         frc.robot.Constants.VisionConstants.LIMELIGHT_NAME,
-        headingDeg,
-        angularVelocityDegPerSec,
+        rawPigeonYaw,
+        rawPigeonAngularVel,
         0,
         0,
         0,
         0);
 
     // ==================== ALLIANCE-BASED TAG ID FILTERING ====================
-    // Only track tags on the relevant side of the field to reduce noise from
-    // distant tags and prevent MegaTag2 multi-tag ambiguity flips.
     var alliance = DriverStation.getAlliance();
     if (alliance.isPresent()) {
       int[] validTags = alliance.get() == Alliance.Red
@@ -175,50 +194,68 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
           frc.robot.Constants.VisionConstants.LIMELIGHT_NAME, validTags);
     }
 
-    // Get MegaTag2 pose estimate (uses robot orientation for better single-tag
-    // accuracy)
-    LimelightHelpers.PoseEstimate mt2Estimate =
-        LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(
-            frc.robot.Constants.VisionConstants.LIMELIGHT_NAME);
+    // ==================== GET MEGATAG2 ESTIMATE ====================
+    LimelightHelpers.PoseEstimate mt2Estimate = LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(
+        frc.robot.Constants.VisionConstants.LIMELIGHT_NAME);
 
-    // Validate measurement exists
+    // --- Gate 1: Null / stale / no tags (cheapest checks first) ---
     if (mt2Estimate == null) {
       SmartDashboard.putString("Vision/Status", "NULL_ESTIMATE");
       instrumentVision("NULL", null, odoPose);
       return;
     }
-
-    // Check for stale/default timestamp (timestamp = 0 means no valid data)
     if (mt2Estimate.timestampSeconds == 0) {
       SmartDashboard.putString("Vision/Status", "STALE_TIMESTAMP");
       instrumentVision("STALE", mt2Estimate, odoPose);
       return;
     }
 
-    // Log vision data for debugging
-    SmartDashboard.putString("Vision/Pose", mt2Estimate.pose.toString());
-    SmartDashboard.putNumber("Vision/TagCount", mt2Estimate.tagCount);
-    SmartDashboard.putNumber("Vision/AvgTagDist", mt2Estimate.avgTagDist);
-    SmartDashboard.putNumber("Vision/LimelightTimestamp", mt2Estimate.timestampSeconds);
-    SmartDashboard.putNumber("Vision/Latency", mt2Estimate.latency);
+    int tagCount = mt2Estimate.tagCount;
+    double avgTagDist = mt2Estimate.avgTagDist;
 
-    // Reject if no tags detected
-    if (mt2Estimate.tagCount == 0) {
+    // Log raw vision data
+    SmartDashboard.putString("Vision/Pose", mt2Estimate.pose.toString());
+    SmartDashboard.putNumber("Vision/TagCount", tagCount);
+    SmartDashboard.putNumber("Vision/AvgTagDist", avgTagDist);
+
+    if (tagCount == 0) {
       SmartDashboard.putString("Vision/Status", "NO_TAGS");
       instrumentVision("NO_TAGS", mt2Estimate, odoPose);
       return;
     }
 
-    // Reject if robot is spinning too fast (MegaTag2 degrades with high angular
-    // velocity)
-    if (Math.abs(angularVelocityDegPerSec)
-        > frc.robot.Constants.VisionConstants.MAX_ANGULAR_VELOCITY_DEG_PER_SEC) {
+    // --- Gate 2: Single-tag ambiguity (uses rawFiducials - cheap array access) ---
+    if (tagCount == 1
+        && mt2Estimate.rawFiducials != null
+        && mt2Estimate.rawFiducials.length > 0
+        && mt2Estimate.rawFiducials[0].ambiguity > frc.robot.Constants.VisionConstants.MAX_AMBIGUITY) {
+      SmartDashboard.putString("Vision/Status", "AMBIGUITY_REJECTED");
+      instrumentVision("AMBIGUITY", mt2Estimate, odoPose);
+      return;
+    }
+
+    // --- Gate 3: Angular velocity (robot spinning too fast for MegaTag2) ---
+    if (Math.abs(rawPigeonAngularVel) > frc.robot.Constants.VisionConstants.MAX_ANGULAR_VELOCITY_DEG_PER_SEC) {
       SmartDashboard.putString("Vision/Status", "ANGULAR_VEL_TOO_HIGH");
       instrumentVision("ANG_VEL", mt2Estimate, odoPose);
       return;
     }
 
-    // Reject if pose is outside field boundaries
+    // --- Gate 4: Max tag distance (far tags have too much pixel error) ---
+    if (avgTagDist > frc.robot.Constants.VisionConstants.MAX_TAG_DISTANCE) {
+      SmartDashboard.putString("Vision/Status", "TOO_FAR");
+      instrumentVision("TOO_FAR", mt2Estimate, odoPose);
+      return;
+    }
+
+    // --- Gate 5: Min tag area (tiny detections are noise) ---
+    if (mt2Estimate.avgTagArea < frc.robot.Constants.VisionConstants.MIN_TAG_AREA) {
+      SmartDashboard.putString("Vision/Status", "TAG_TOO_SMALL");
+      instrumentVision("TAG_SMALL", mt2Estimate, odoPose);
+      return;
+    }
+
+    // --- Gate 6: Field boundary check ---
     double x = mt2Estimate.pose.getX();
     double y = mt2Estimate.pose.getY();
     double margin = frc.robot.Constants.VisionConstants.FIELD_BORDER_MARGIN;
@@ -231,84 +268,76 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
       return;
     }
 
-    // ==================== MEGATAG2 FLIP FIX ====================
-    // Reject vision measurements that diverge too far from the current odometry
-    // estimate. This catches the "MegaTag2 flip" where the pose jumps to the
-    // opposite side of the field due to heading/IMU errors or multi-tag ambiguity.
+    // --- Gate 7: Odometry divergence (catches MegaTag2 flip) ---
     double visionOdoDist = mt2Estimate.pose.getTranslation().getDistance(odoPose.getTranslation());
-    int tagCount = mt2Estimate.tagCount;
     double maxDivergence = tagCount <= 1
         ? frc.robot.Constants.VisionConstants.MAX_VISION_ODO_DIVERGENCE_SINGLE_TAG
         : frc.robot.Constants.VisionConstants.MAX_VISION_ODO_DIVERGENCE_MULTI_TAG;
 
     SmartDashboard.putNumber("Vision/OdoDivergence", visionOdoDist);
+    SmartDashboard.putBoolean("Vision/Localized", m_visionLocalized);
 
-    if (visionOdoDist > maxDivergence) {
+    // If we have never been localized, skip divergence check so the first valid
+    // vision measurement can bootstrap the pose estimator.
+    if (m_visionLocalized && visionOdoDist > maxDivergence) {
       SmartDashboard.putString("Vision/Status", "ODO_DIVERGE_REJECTED");
       instrumentVision("ODO_DIVERGE", mt2Estimate, odoPose);
       return;
     }
 
-    // Calculate dynamic standard deviations based on distance and tag count
-    // Formula from Team 6328: stdDev = coefficient * (avgDist^1.2) / (tagCount^2)
-    double avgTagDist = mt2Estimate.avgTagDist;
-
-    double xyStdDev = frc.robot.Constants.VisionConstants.XY_STD_DEV_COEFFICIENT
-        * Math.pow(avgTagDist, 1.2)
-        / Math.pow(tagCount, 2.0);
-
-    // ==================== MULTI-TAG AMBIGUITY SCALING ====================
-    // If multi-tag result is in the "suspicious" range (diverging from odometry
-    // but not enough to hard-reject), scale up std devs so the Kalman filter
-    // applies only a weak correction instead of a full jump.
-    if (tagCount >= 2
-        && visionOdoDist > frc.robot.Constants.VisionConstants.SUSPICIOUS_DIVERGENCE_THRESHOLD) {
-      xyStdDev *= frc.robot.Constants.VisionConstants.SUSPICIOUS_STD_DEV_SCALE;
-      SmartDashboard.putString("Vision/Status", "ACCEPTED_SUSPICIOUS");
+    // First-time localization: hard-reset odometry to vision pose
+    if (!m_visionLocalized) {
+      resetPose(mt2Estimate.pose);
+      m_visionLocalized = true;
+      SmartDashboard.putString("Vision/Status", "BOOTSTRAP_RESET");
+      instrumentVision("BOOTSTRAP", mt2Estimate, odoPose);
+      System.out.println("[Vision] Bootstrap localization: reset pose to " + mt2Estimate.pose);
+      return;
     }
 
-    // MegaTag2 doesn't provide reliable heading, so use very high theta std dev
+    // ==================== DISTANCE-BASED STD DEVS ====================
+    // Interpolate from the lookup table, scaled by 1/tagCount
+    double xyStdDev = frc.robot.Constants.VisionConstants.interpolateStdDev(avgTagDist, tagCount);
+
+    // MegaTag2 doesn't provide reliable heading - infinite theta std dev
     double thetaStdDev = Double.POSITIVE_INFINITY;
 
-    // Create standard deviation matrix
-    Matrix<N3, N1> visionStdDevs =
-        edu.wpi.first.math.VecBuilder.fill(xyStdDev, xyStdDev, thetaStdDev);
+    Matrix<N3, N1> visionStdDevs = edu.wpi.first.math.VecBuilder.fill(xyStdDev, xyStdDev, thetaStdDev);
 
-    // ==================== VERY IMPORTANT! TIMESTAMP FIX ====================
-    // The Limelight's timestampSeconds is in NetworkTables server time, NOT FPGA
-    // time.
-    // CTRE's SwerveDrivetrain expects FPGA timestamps for its pose buffer.
-    //
-    // Solution: Calculate the FPGA timestamp by taking the current FPGA time
-    // and subtracting the total latency reported by Limelight.
-    // This gives us the approximate FPGA time when the image was captured.
-    double latencySeconds = mt2Estimate.latency / 1000.0; // Convert ms to seconds
-    double fpgaTimestamp = edu.wpi.first.wpilibj.Timer.getFPGATimestamp() - latencySeconds;
+    // ==================== TIMESTAMP ====================
+    // mt2Estimate.timestampSeconds is already an FPGA-based timestamp with latency
+    // subtracted (NT server time - pipeline latency). Use it directly.
+    // The addVisionMeasurement override applies Utils.fpgaToCurrentTime().
+    double visionTimestamp = mt2Estimate.timestampSeconds;
 
     SmartDashboard.putNumber("Vision/XYStdDev", xyStdDev);
-    SmartDashboard.putNumber("Vision/FPGATimestamp", fpgaTimestamp);
+    SmartDashboard.putNumber("Vision/Timestamp", visionTimestamp);
     SmartDashboard.putString("Vision/Status", "ACCEPTED");
     instrumentVision("ACCEPTED", mt2Estimate, odoPose);
 
-    // Call the instance method (this.) which uses our overridden version
-    // The override applies Utils.fpgaToCurrentTime() to convert FPGA time to CTRE
-    // time
-    this.addVisionMeasurement(mt2Estimate.pose, fpgaTimestamp, visionStdDevs);
+    this.addVisionMeasurement(mt2Estimate.pose, visionTimestamp, visionStdDevs);
   }
 
   // ==================== VISION DEBUG INSTRUMENTATION ====================
   /**
-   * Publishes a vision diagnostic snapshot to SmartDashboard (under "LL/") and prints a throttled
+   * Publishes a vision diagnostic snapshot to SmartDashboard (under "LL/") and
+   * prints a throttled
    * console line with the "[LLDBG]" prefix.
    *
-   * <p>Console output fires at ~4 Hz (every 250 ms) under steady state, but immediately on any
-   * status change, tag-count change, or pose jump (>0.5 m between consecutive accepted poses).
+   * <p>
+   * Console output fires at ~4 Hz (every 250 ms) under steady state, but
+   * immediately on any
+   * status change, tag-count change, or pose jump (>0.5 m between consecutive
+   * accepted poses).
    *
-   * <p>This method is observation-only: it does NOT modify any filter thresholds, reject/accept
+   * <p>
+   * This method is observation-only: it does NOT modify any filter thresholds,
+   * reject/accept
    * decisions, or estimator inputs.
    *
-   * @param status Short status label matching the decision that was just made in updateVision()
-   * @param est The MegaTag2 PoseEstimate (may be null for NULL status)
+   * @param status  Short status label matching the decision that was just made in
+   *                updateVision()
+   * @param est     The MegaTag2 PoseEstimate (may be null for NULL status)
    * @param odoPose Current odometry pose for comparison with the vision pose
    */
   private void instrumentVision(String status, LimelightHelpers.PoseEstimate est, Pose2d odoPose) {
@@ -392,8 +421,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     // --- Console logging (throttled unless something notable happened) ---
     boolean statusChanged = !status.equals(m_lastVisionStatus);
     boolean tagCountChanged = tagCount != m_lastVisionTagCount;
-    boolean shouldLog =
-        jumped || statusChanged || tagCountChanged || (nowMs - m_lastVisionLogMs >= 250);
+    boolean shouldLog = jumped || statusChanged || tagCountChanged || (nowMs - m_lastVisionLogMs >= 250);
 
     if (shouldLog) {
       String jumpFlag = jumped ? String.format("*** JUMP %.2fm *** ", jumpDist) : "";
@@ -458,11 +486,14 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /**
    * Constructs a CTRE SwerveDrivetrain using the specified constants.
    *
-   * <p>This constructs the underlying hardware devices, so users should not construct the devices
-   * themselves. If they need the devices, they can access them through getters in the classes.
+   * <p>
+   * This constructs the underlying hardware devices, so users should not
+   * construct the devices
+   * themselves. If they need the devices, they can access them through getters in
+   * the classes.
    *
    * @param drivetrainConstants Drivetrain-wide constants for the swerve drive
-   * @param modules Constants for each specific module
+   * @param modules             Constants for each specific module
    */
   public CommandSwerveDrivetrain(
       SwerveDrivetrainConstants drivetrainConstants, SwerveModuleConstants<?, ?, ?>... modules) {
@@ -476,13 +507,18 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /**
    * Constructs a CTRE SwerveDrivetrain using the specified constants.
    *
-   * <p>This constructs the underlying hardware devices, so users should not construct the devices
-   * themselves. If they need the devices, they can access them through getters in the classes.
+   * <p>
+   * This constructs the underlying hardware devices, so users should not
+   * construct the devices
+   * themselves. If they need the devices, they can access them through getters in
+   * the classes.
    *
-   * @param drivetrainConstants Drivetrain-wide constants for the swerve drive
-   * @param odometryUpdateFrequency The frequency to run the odometry loop. If unspecified or set to
-   *     0 Hz, this is 250 Hz on CAN FD, and 100 Hz on CAN 2.0.
-   * @param modules Constants for each specific module
+   * @param drivetrainConstants     Drivetrain-wide constants for the swerve drive
+   * @param odometryUpdateFrequency The frequency to run the odometry loop. If
+   *                                unspecified or set to
+   *                                0 Hz, this is 250 Hz on CAN FD, and 100 Hz on
+   *                                CAN 2.0.
+   * @param modules                 Constants for each specific module
    */
   public CommandSwerveDrivetrain(
       SwerveDrivetrainConstants drivetrainConstants,
@@ -498,17 +534,26 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /**
    * Constructs a CTRE SwerveDrivetrain using the specified constants.
    *
-   * <p>This constructs the underlying hardware devices, so users should not construct the devices
-   * themselves. If they need the devices, they can access them through getters in the classes.
+   * <p>
+   * This constructs the underlying hardware devices, so users should not
+   * construct the devices
+   * themselves. If they need the devices, they can access them through getters in
+   * the classes.
    *
-   * @param drivetrainConstants Drivetrain-wide constants for the swerve drive
-   * @param odometryUpdateFrequency The frequency to run the odometry loop. If unspecified or set to
-   *     0 Hz, this is 250 Hz on CAN FD, and 100 Hz on CAN 2.0.
-   * @param odometryStandardDeviation The standard deviation for odometry calculation in the form
-   *     [x, y, theta]ᵀ, with units in meters and radians
-   * @param visionStandardDeviation The standard deviation for vision calculation in the form [x, y,
-   *     theta]ᵀ, with units in meters and radians
-   * @param modules Constants for each specific module
+   * @param drivetrainConstants       Drivetrain-wide constants for the swerve
+   *                                  drive
+   * @param odometryUpdateFrequency   The frequency to run the odometry loop. If
+   *                                  unspecified or set to
+   *                                  0 Hz, this is 250 Hz on CAN FD, and 100 Hz
+   *                                  on CAN 2.0.
+   * @param odometryStandardDeviation The standard deviation for odometry
+   *                                  calculation in the form
+   *                                  [x, y, theta]ᵀ, with units in meters and
+   *                                  radians
+   * @param visionStandardDeviation   The standard deviation for vision
+   *                                  calculation in the form [x, y,
+   *                                  theta]ᵀ, with units in meters and radians
+   * @param modules                   Constants for each specific module
    */
   public CommandSwerveDrivetrain(
       SwerveDrivetrainConstants drivetrainConstants,
@@ -550,8 +595,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
           // case
           () -> DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Red,
           this // Subsystem for
-          // requirements
-          );
+      // requirements
+      );
     } catch (Exception ex) {
       DriverStation.reportError(
           "Failed to load PathPlanner config and configure AutoBuilder", ex.getStackTrace());
@@ -559,7 +604,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   }
 
   /**
-   * Returns a command that applies the specified control request to this swerve drivetrain.
+   * Returns a command that applies the specified control request to this swerve
+   * drivetrain.
    *
    * @param request Function returning the request to apply
    * @return Command to run
@@ -569,7 +615,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   }
 
   /**
-   * Follow a Choreo swerve sample. This method is passed into Choreo's AutoFactory.
+   * Follow a Choreo swerve sample. This method is passed into Choreo's
+   * AutoFactory.
    *
    * @param sample Choreo sample at the current autonomous timestamp
    */
@@ -587,7 +634,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   }
 
   /**
-   * Runs the SysId Quasistatic test in the given direction for the routine specified by
+   * Runs the SysId Quasistatic test in the given direction for the routine
+   * specified by
    * {@link #m_sysIdRoutineToApply}.
    *
    * @param direction Direction of the SysId Quasistatic test
@@ -598,7 +646,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   }
 
   /**
-   * Runs the SysId Dynamic test in the given direction for the routine specified by
+   * Runs the SysId Dynamic test in the given direction for the routine specified
+   * by
    * {@link #m_sysIdRoutineToApply}.
    *
    * @param direction Direction of the SysId Dynamic test
@@ -641,11 +690,14 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   // Following the official CTRE Phoenix6 2026 examples pattern
 
   /**
-   * Adds a vision measurement to the Kalman Filter. This will correct the odometry pose estimate
+   * Adds a vision measurement to the Kalman Filter. This will correct the
+   * odometry pose estimate
    * while still accounting for measurement noise.
    *
-   * @param visionRobotPoseMeters The pose of the robot as measured by the vision camera.
-   * @param timestampSeconds The timestamp of the vision measurement in seconds.
+   * @param visionRobotPoseMeters The pose of the robot as measured by the vision
+   *                              camera.
+   * @param timestampSeconds      The timestamp of the vision measurement in
+   *                              seconds.
    */
   @Override
   public void addVisionMeasurement(Pose2d visionRobotPoseMeters, double timestampSeconds) {
@@ -653,17 +705,24 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   }
 
   /**
-   * Adds a vision measurement to the Kalman Filter. This will correct the odometry pose estimate
+   * Adds a vision measurement to the Kalman Filter. This will correct the
+   * odometry pose estimate
    * while still accounting for measurement noise.
    *
-   * <p>Note that the vision measurement standard deviations passed into this method will continue
+   * <p>
+   * Note that the vision measurement standard deviations passed into this method
+   * will continue
    * to apply to future measurements until a subsequent call to
    * {@link #setVisionMeasurementStdDevs(Matrix)} or this method.
    *
-   * @param visionRobotPoseMeters The pose of the robot as measured by the vision camera.
-   * @param timestampSeconds The timestamp of the vision measurement in seconds.
-   * @param visionMeasurementStdDevs Standard deviations of the vision pose measurement in the form
-   *     [x, y, theta]ᵀ, with units in meters and radians.
+   * @param visionRobotPoseMeters    The pose of the robot as measured by the
+   *                                 vision camera.
+   * @param timestampSeconds         The timestamp of the vision measurement in
+   *                                 seconds.
+   * @param visionMeasurementStdDevs Standard deviations of the vision pose
+   *                                 measurement in the form
+   *                                 [x, y, theta]ᵀ, with units in meters and
+   *                                 radians.
    */
   @Override
   public void addVisionMeasurement(
@@ -678,7 +737,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
    * Return the pose at a given timestamp, if the buffer is not empty.
    *
    * @param timestampSeconds The timestamp of the pose in seconds.
-   * @return The pose at the given timestamp (or Optional.empty() if the buffer is empty).
+   * @return The pose at the given timestamp (or Optional.empty() if the buffer is
+   *         empty).
    */
   @Override
   public Optional<Pose2d> samplePoseAt(double timestampSeconds) {
@@ -705,22 +765,27 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /**
    * Creates a SwerveRequest for smooth teleop field-centric driving.
    *
-   * <p>Uses OpenLoopVoltage for more responsive driving feel during teleop (as opposed to Velocity
+   * <p>
+   * Uses OpenLoopVoltage for more responsive driving feel during teleop (as
+   * opposed to Velocity
    * mode which can feel sluggish).
    */
-  private final SwerveRequest.ApplyFieldSpeeds m_fieldCentricRequest =
-      new SwerveRequest.ApplyFieldSpeeds()
-          .withDriveRequestType(SwerveModule.DriveRequestType.OpenLoopVoltage);
+  private final SwerveRequest.ApplyFieldSpeeds m_fieldCentricRequest = new SwerveRequest.ApplyFieldSpeeds()
+      .withDriveRequestType(SwerveModule.DriveRequestType.OpenLoopVoltage);
 
   /**
    * Calculate chassis speeds with skew compensation for smooth driving.
    *
-   * <p>Skew compensation corrects for the drift that occurs when both translating and rotating
-   * simultaneously. The robot's actual heading is predicted slightly ahead based on current
+   * <p>
+   * Skew compensation corrects for the drift that occurs when both translating
+   * and rotating
+   * simultaneously. The robot's actual heading is predicted slightly ahead based
+   * on current
    * rotational velocity.
    *
-   * @param xVelocity Field-relative X velocity (m/s, positive = toward opposing alliance)
-   * @param yVelocity Field-relative Y velocity (m/s, positive = left)
+   * @param xVelocity       Field-relative X velocity (m/s, positive = toward
+   *                        opposing alliance)
+   * @param yVelocity       Field-relative Y velocity (m/s, positive = left)
    * @param angularVelocity Angular velocity (rad/s, positive = counter-clockwise)
    * @return ChassisSpeeds with skew compensation applied
    */
@@ -731,8 +796,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     var currentSpeeds = getState().Speeds;
 
     // Calculate skew compensation factor based on current angular velocity
-    Rotation2d skewCompensationFactor =
-        Rotation2d.fromRadians(currentSpeeds.omegaRadiansPerSecond * SKEW_COMPENSATION_SCALAR);
+    Rotation2d skewCompensationFactor = Rotation2d
+        .fromRadians(currentSpeeds.omegaRadiansPerSecond * SKEW_COMPENSATION_SCALAR);
 
     // Convert field-relative speeds to robot-relative, then back to field-relative
     // with the skew compensation applied
@@ -745,15 +810,19 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /**
    * Apply field-centric driving with smooth driving tuning.
    *
-   * <p>Features: - Deadband application to eliminate joystick drift - Squared angular input for
-   * finer low-speed rotation control - Skew compensation for smooth combined translation/rotation -
-   * OpenLoopVoltage mode for responsive feel - Runtime velocity coefficients for slow mode /
+   * <p>
+   * Features: - Deadband application to eliminate joystick drift - Squared
+   * angular input for
+   * finer low-speed rotation control - Skew compensation for smooth combined
+   * translation/rotation -
+   * OpenLoopVoltage mode for responsive feel - Runtime velocity coefficients for
+   * slow mode /
    * scoring mode
    *
-   * @param xInput Raw X joystick input (-1 to 1)
-   * @param yInput Raw Y joystick input (-1 to 1)
-   * @param rotationInput Raw rotation joystick input (-1 to 1)
-   * @param maxVelocity Maximum translation velocity (m/s)
+   * @param xInput             Raw X joystick input (-1 to 1)
+   * @param yInput             Raw Y joystick input (-1 to 1)
+   * @param rotationInput      Raw rotation joystick input (-1 to 1)
+   * @param maxVelocity        Maximum translation velocity (m/s)
    * @param maxAngularVelocity Maximum angular velocity (rad/s)
    */
   public void driveFieldCentricSmooth(
@@ -775,22 +844,20 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     // Calculate velocities (flip for alliance if needed)
     // Apply velocity coefficients for runtime speed adjustment (slow mode, etc.)
     boolean isBlueAlliance = DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue;
-    double xVelocity =
-        (isBlueAlliance ? -xMagnitude : xMagnitude) * maxVelocity * teleopVelocityCoefficient;
-    double yVelocity =
-        (isBlueAlliance ? -yMagnitude : yMagnitude) * maxVelocity * teleopVelocityCoefficient;
+    double xVelocity = (isBlueAlliance ? -xMagnitude : xMagnitude) * maxVelocity * teleopVelocityCoefficient;
+    double yVelocity = (isBlueAlliance ? -yMagnitude : yMagnitude) * maxVelocity * teleopVelocityCoefficient;
     double angularVelocity = -angularMagnitude * maxAngularVelocity * rotationVelocityCoefficient;
 
     // Apply skew compensation for smooth combined translation/rotation
-    ChassisSpeeds compensatedSpeeds =
-        calculateSpeedsWithSkewCompensation(xVelocity, yVelocity, angularVelocity);
+    ChassisSpeeds compensatedSpeeds = calculateSpeedsWithSkewCompensation(xVelocity, yVelocity, angularVelocity);
 
     // Apply to drivetrain using OpenLoopVoltage for responsive feel
     setControl(m_fieldCentricRequest.withSpeeds(compensatedSpeeds));
   }
 
   /**
-   * Set the translation velocity coefficient for teleop driving. Use this for slow mode, scoring
+   * Set the translation velocity coefficient for teleop driving. Use this for
+   * slow mode, scoring
    * mode, etc.
    *
    * @param coefficient Speed multiplier (0.0 = stopped, 1.0 = full speed)
@@ -802,7 +869,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /**
    * Set the rotation velocity coefficient for teleop driving.
    *
-   * @param coefficient Rotation speed multiplier (0.0 = no rotation, 1.0 = full rotation)
+   * @param coefficient Rotation speed multiplier (0.0 = no rotation, 1.0 = full
+   *                    rotation)
    */
   public void setRotationVelocityCoefficient(double coefficient) {
     this.rotationVelocityCoefficient = MathUtil.clamp(coefficient, 0.0, 1.0);
@@ -816,11 +884,14 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /**
    * Creates a command for smooth teleop driving
    *
-   * @param xInputSupplier Supplier for X joystick input (typically leftY, inverted)
-   * @param yInputSupplier Supplier for Y joystick input (typically leftX, inverted)
-   * @param rotationInputSupplier Supplier for rotation joystick input (typically rightX)
-   * @param maxVelocity Maximum translation velocity (m/s)
-   * @param maxAngularVelocity Maximum angular velocity (rad/s)
+   * @param xInputSupplier        Supplier for X joystick input (typically leftY,
+   *                              inverted)
+   * @param yInputSupplier        Supplier for Y joystick input (typically leftX,
+   *                              inverted)
+   * @param rotationInputSupplier Supplier for rotation joystick input (typically
+   *                              rightX)
+   * @param maxVelocity           Maximum translation velocity (m/s)
+   * @param maxAngularVelocity    Maximum angular velocity (rad/s)
    * @return Command that continuously applies smooth driving
    */
   public Command smoothTeleopDriveCommand(
@@ -846,8 +917,10 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   }
 
   /**
-   * Enable heading lock mode with a specific target heading. In this mode, the robot will
-   * automatically rotate to face the target heading while still allowing the driver to control
+   * Enable heading lock mode with a specific target heading. In this mode, the
+   * robot will
+   * automatically rotate to face the target heading while still allowing the
+   * driver to control
    * translation.
    *
    * @param targetDegrees The target heading in degrees (field-relative)
@@ -892,13 +965,16 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /**
    * Apply field-centric driving WITH heading lock.
    *
-   * <p>The driver controls translation (X/Y), but rotation is automatically controlled by the
-   * heading controller to maintain the locked heading. This creates a "turret mode" where the robot
+   * <p>
+   * The driver controls translation (X/Y), but rotation is automatically
+   * controlled by the
+   * heading controller to maintain the locked heading. This creates a "turret
+   * mode" where the robot
    * faces a specific direction regardless of how the driver is strafing.
    *
-   * @param xInput Raw X joystick input (-1 to 1)
-   * @param yInput Raw Y joystick input (-1 to 1)
-   * @param maxVelocity Maximum translation velocity (m/s)
+   * @param xInput             Raw X joystick input (-1 to 1)
+   * @param yInput             Raw Y joystick input (-1 to 1)
+   * @param maxVelocity        Maximum translation velocity (m/s)
    * @param maxAngularVelocity Maximum angular velocity (rad/s)
    */
   public void driveWithHeadingLock(
@@ -910,10 +986,8 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
     // Calculate translation velocities (flip for alliance)
     boolean isBlueAlliance = DriverStation.getAlliance().orElse(Alliance.Blue) == Alliance.Blue;
-    double xVelocity =
-        (isBlueAlliance ? -xMagnitude : xMagnitude) * maxVelocity * teleopVelocityCoefficient;
-    double yVelocity =
-        (isBlueAlliance ? -yMagnitude : yMagnitude) * maxVelocity * teleopVelocityCoefficient;
+    double xVelocity = (isBlueAlliance ? -xMagnitude : xMagnitude) * maxVelocity * teleopVelocityCoefficient;
+    double yVelocity = (isBlueAlliance ? -yMagnitude : yMagnitude) * maxVelocity * teleopVelocityCoefficient;
 
     // Get current heading
     double currentHeadingDegrees = getState().Pose.getRotation().getDegrees();
@@ -925,8 +999,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     double angularVelocity = rotationOutput * maxAngularVelocity;
 
     // Apply skew compensation
-    ChassisSpeeds compensatedSpeeds =
-        calculateSpeedsWithSkewCompensation(xVelocity, yVelocity, angularVelocity);
+    ChassisSpeeds compensatedSpeeds = calculateSpeedsWithSkewCompensation(xVelocity, yVelocity, angularVelocity);
 
     // Apply to drivetrain
     setControl(m_fieldCentricRequest.withSpeeds(compensatedSpeeds));
@@ -938,14 +1011,16 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /**
    * Creates a command for heading-locked driving.
    *
-   * <p>The driver controls translation with the left stick, but the robot automatically rotates to
+   * <p>
+   * The driver controls translation with the left stick, but the robot
+   * automatically rotates to
    * face the specified target heading.
    *
-   * @param xInputSupplier Supplier for X joystick input
-   * @param yInputSupplier Supplier for Y joystick input
+   * @param xInputSupplier        Supplier for X joystick input
+   * @param yInputSupplier        Supplier for Y joystick input
    * @param targetHeadingSupplier Supplier for target heading in degrees
-   * @param maxVelocity Maximum translation velocity (m/s)
-   * @param maxAngularVelocity Maximum angular velocity (rad/s)
+   * @param maxVelocity           Maximum translation velocity (m/s)
+   * @param maxAngularVelocity    Maximum angular velocity (rad/s)
    * @return Command that applies heading-locked driving
    */
   public Command headingLockedDriveCommand(
@@ -956,31 +1031,31 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
       double maxAngularVelocity) {
 
     return run(() -> {
-          // Update target heading each loop (allows dynamic targeting like AprilTag
-          // tracking)
-          double targetHeading = targetHeadingSupplier.getAsDouble();
-          if (!m_headingLockEnabled) {
-            enableHeadingLock(targetHeading);
-          } else {
-            updateHeadingLockTarget(targetHeading);
-          }
+      // Update target heading each loop (allows dynamic targeting like AprilTag
+      // tracking)
+      double targetHeading = targetHeadingSupplier.getAsDouble();
+      if (!m_headingLockEnabled) {
+        enableHeadingLock(targetHeading);
+      } else {
+        updateHeadingLockTarget(targetHeading);
+      }
 
-          driveWithHeadingLock(
-              xInputSupplier.getAsDouble(),
-              yInputSupplier.getAsDouble(),
-              maxVelocity,
-              maxAngularVelocity);
-        })
+      driveWithHeadingLock(
+          xInputSupplier.getAsDouble(),
+          yInputSupplier.getAsDouble(),
+          maxVelocity,
+          maxAngularVelocity);
+    })
         .finallyDo(this::disableHeadingLock);
   }
 
   /**
    * Creates a command for heading-locked driving to a FIXED heading.
    *
-   * @param xInputSupplier Supplier for X joystick input
-   * @param yInputSupplier Supplier for Y joystick input
+   * @param xInputSupplier     Supplier for X joystick input
+   * @param yInputSupplier     Supplier for Y joystick input
    * @param fixedTargetHeading Fixed target heading in degrees
-   * @param maxVelocity Maximum translation velocity (m/s)
+   * @param maxVelocity        Maximum translation velocity (m/s)
    * @param maxAngularVelocity Maximum angular velocity (rad/s)
    * @return Command that applies heading-locked driving to the fixed heading
    */
@@ -1000,10 +1075,13 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
   /**
    * Create a command to pathfind to AprilTag 10 (Red Alliance Hub Face).
    *
-   * <p>Uses the AD* pathfinding algorithm to find a safe path around obstacles, then follows the
+   * <p>
+   * Uses the AD* pathfinding algorithm to find a safe path around obstacles, then
+   * follows the
    * path using PID control.
    *
-   * @return Command that pathfinds and drives to the scoring position in front of AprilTag 10
+   * @return Command that pathfinds and drives to the scoring position in front of
+   *         AprilTag 10
    */
   public Command pathfindToAprilTag10() {
     return frc.robot.pathfinding.PathfindToTagCommand.toAprilTag10(this);

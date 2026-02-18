@@ -6,7 +6,6 @@ package frc.robot.subsystems;
 
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
-import edu.wpi.first.math.util.Units;
 import edu.wpi.first.networktables.NetworkTable;
 import edu.wpi.first.networktables.NetworkTableEntry;
 import edu.wpi.first.networktables.NetworkTableInstance;
@@ -37,10 +36,7 @@ public class LimelightSubsystem extends SubsystemBase {
   private final NetworkTableEntry botPoseFieldBlue; // Robot pose on field (Blue origin)
   private final NetworkTableEntry activePipeline; // Current pipeline index
 
-  // Configuration
-  private boolean useLimelightForOdometry = false;
-
-  // Reference to drivetrain for odometry updates (set via setDrivetrain method)
+  // Reference to drivetrain (used by other subsystems for alignment)
   private CommandSwerveDrivetrain drivetrain;
 
   /** Creates a new LimelightSubsystem */
@@ -74,24 +70,6 @@ public class LimelightSubsystem extends SubsystemBase {
     this.drivetrain = drivetrain;
   }
 
-  /**
-   * Enable or disable using Limelight for odometry updates
-   *
-   * <p>WATCH OUT! Vision-based pose estimation is now handled directly in CommandSwerveDrivetrain
-   * using MegaTag2 with proper standard deviations. This method is kept for compatibility but the
-   * subsystem's vision updates are disabled.
-   *
-   * @param enable True to use Limelight for odometry (currently disabled - use drivetrain instead)
-   * @deprecated Vision updates are now handled in CommandSwerveDrivetrain.updateVision()
-   */
-  @Deprecated
-  public void setUseLimelightForOdometry(boolean enable) {
-    // Vision updates are now consolidated in CommandSwerveDrivetrain.updateVision()
-    // This prevents duplicate vision measurements and ensures consistent std dev
-    // calculations
-    this.useLimelightForOdometry = false; // Always disabled - drivetrain handles vision
-  }
-
   @Override
   public void periodic() {
     // Update SmartDashboard with vision data
@@ -110,26 +88,6 @@ public class LimelightSubsystem extends SubsystemBase {
     // - Dynamic standard deviations based on tag distance/count
     // - Angular velocity rejection for MegaTag2 accuracy
     // - Field boundary validation
-  }
-
-  /** Update drivetrain odometry with Limelight vision measurements */
-  private void updateOdometryWithVision() {
-    // Get drivetrain state for orientation data
-    var driveState = drivetrain.getState();
-    double headingDeg = driveState.Pose.getRotation().getDegrees();
-    double omegaRps = Units.radiansToRotations(driveState.Speeds.omegaRadiansPerSecond);
-
-    // Set robot orientation in Limelight
-    LimelightHelpers.SetRobotOrientation(VisionConstants.LIMELIGHT_NAME, headingDeg, 0, 0, 0, 0, 0);
-
-    // Get pose estimate using MegaTag2
-    var llMeasurement =
-        LimelightHelpers.getBotPoseEstimate_wpiBlue_MegaTag2(VisionConstants.LIMELIGHT_NAME);
-
-    // Only add measurement if valid (has tags and robot isn't spinning too fast)
-    if (llMeasurement != null && llMeasurement.tagCount > 0 && omegaRps < 2.0) {
-      drivetrain.addVisionMeasurement(llMeasurement.pose, llMeasurement.timestampSeconds);
-    }
   }
 
   // ==================== GETTER METHODS ====================

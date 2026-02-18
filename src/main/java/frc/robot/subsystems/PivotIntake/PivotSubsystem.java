@@ -16,12 +16,15 @@ import frc.robot.lib.NetworkedLib.NetworkedTalonFX;
 public class PivotSubsystem extends SubsystemBase {
 
   private final NetworkedTalonFX pivotMotor = new NetworkedTalonFX(IntakeConstants.Pivot.MOTOR_ID, Constants.kCANBus);
-  private double pivotSetpoint = IntakeConstants.Pivot.STOWED_POSITION;
+  private double pivotSetpoint;
   private final PositionVoltage m_positionVoltage = new PositionVoltage(pivotSetpoint);
   private final NeutralOut m_neutralVoltage = new NeutralOut();
 
   public PivotSubsystem() {
     configurePivotMotor();
+
+    // this stops pivot from trying to move immediately (set to pivot position)
+    pivotSetpoint = getPivotPosition();
   }
 
   // Configure Pivot Motor

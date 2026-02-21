@@ -736,8 +736,7 @@ public class LimelightHelpers {
       if (obj == null || getClass() != obj.getClass()) return false;
       PoseEstimate that = (PoseEstimate) obj;
       // We don't compare the timestampSeconds as it isn't relevant for equality and
-      // makes
-      // unit testing harder
+      // makes unit testing harder
       return Double.compare(that.latency, latency) == 0
           && tagCount == that.tagCount
           && Double.compare(that.tagSpan, tagSpan) == 0

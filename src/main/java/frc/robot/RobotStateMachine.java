@@ -1,5 +1,6 @@
 package frc.robot;
 
+import edu.wpi.first.hal.PowerJNI;
 import edu.wpi.first.wpilibj.DriverStation;
 import edu.wpi.first.wpilibj.DriverStation.Alliance;
 import edu.wpi.first.wpilibj.GenericHID.RumbleType;
@@ -611,8 +612,10 @@ public class RobotStateMachine extends SubsystemBase {
     // Match State
     SmartDashboard.putString("Match State", matchState.name());
     SmartDashboard.putString("Match Description", matchState.description);
+    SmartDashboard.putNumber("Match Time", getMatchTime());
     SmartDashboard.putBoolean("Robot Enabled", matchState.enabled);
     SmartDashboard.putBoolean("Is Autonomous", matchState.autonomous);
+    SmartDashboard.putNumber("Voltage", getBatteryVoltage());
 
     // Game State
     SmartDashboard.putString("Game State", gameState.name());
@@ -669,6 +672,10 @@ public class RobotStateMachine extends SubsystemBase {
     return matchState;
   }
 
+  public double getMatchTime(){
+    return DriverStation.getMatchTime();
+  }
+
   public GameState getGameState() {
     return gameState;
   }
@@ -695,6 +702,10 @@ public class RobotStateMachine extends SubsystemBase {
 
   public int getFuelCount() {
     return fuelCount;
+  }
+
+  public double getBatteryVoltage(){
+    return PowerJNI.getVinVoltage();
   }
 
   public boolean isEnabled() {

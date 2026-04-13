@@ -124,6 +124,7 @@ macOS/Linux:
 | Aaryan      | [@Acer-15](https://github.com/Acer-15)                       | Intake motor control (PR #17), intake binds (PR #27)                                |
 | Nethul      | [@Thatcoder321](https://github.com/Thatcoder321)             | Indexer bring-up and testing (PR #18)                                               |
 | Seth        | [@SethMortenson64](https://github.com/SethMortenson64)       | Formatter setup and CI tooling (PRs #9, #25)                                        |
+| Fish        | [@sockeye-d](https://github.com/sockeye-d)                   | Removed pre-commit hooks, added formatter CI workflow (PR #25)                      |
 | Dhruv       | [@Duve3](https://github.com/Duve3)                           | NetworkedLib for runtime-adjustable values (PR #24)                                 |
 
 ---
